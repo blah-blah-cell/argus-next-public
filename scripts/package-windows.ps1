@@ -3,6 +3,11 @@ param([string]$OutputDirectory)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+# [IO.Path]::GetRelativePath needs PowerShell 7; Windows PowerShell 5.1 does not have it.
+function Get-PackageRelativePath([string]$Base, [string]$Full) {
+    $Base = $Base.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    return $Full.Substring($Base.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+}
 $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $RepositoryRoot 'dist' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
@@ -58,13 +63,13 @@ foreach ($source in $files.Keys) {
     Copy-Item -LiteralPath (Join-Path $RepositoryRoot $source) -Destination $destination
 }
 foreach ($source in $pythonFiles) {
-    $relative = [IO.Path]::GetRelativePath($PythonSource, $source.FullName)
+    $relative = Get-PackageRelativePath $PythonSource $source.FullName
     $destination = Join-Path $PackageRoot (Join-Path 'python/src' $relative)
     New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
     Copy-Item -LiteralPath $source.FullName -Destination $destination
 }
 $manifest = @(Get-ChildItem -LiteralPath $PackageRoot -Recurse -File | Sort-Object FullName | ForEach-Object {
-    $relative = [IO.Path]::GetRelativePath($PackageRoot, $_.FullName).Replace('\', '/')
+    $relative = (Get-PackageRelativePath $PackageRoot $_.FullName).Replace('\', '/')
     '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $relative
 })
 # Write LF only: GNU sha256sum and WSL/Git Bash would otherwise treat the CR as part of the filename.
