@@ -3,6 +3,11 @@ param([string]$OutputDirectory)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+# [IO.Path]::GetRelativePath needs PowerShell 7; Windows PowerShell 5.1 does not have it.
+function Get-PackageRelativePath([string]$Base, [string]$Full) {
+    $Base = $Base.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    return $Full.Substring($Base.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+}
 $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $RepositoryRoot 'dist' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
@@ -58,17 +63,35 @@ foreach ($source in $files.Keys) {
     Copy-Item -LiteralPath (Join-Path $RepositoryRoot $source) -Destination $destination
 }
 foreach ($source in $pythonFiles) {
-    $relative = [IO.Path]::GetRelativePath($PythonSource, $source.FullName)
+    $relative = Get-PackageRelativePath $PythonSource $source.FullName
     $destination = Join-Path $PackageRoot (Join-Path 'python/src' $relative)
     New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
     Copy-Item -LiteralPath $source.FullName -Destination $destination
 }
 $manifest = @(Get-ChildItem -LiteralPath $PackageRoot -Recurse -File | Sort-Object FullName | ForEach-Object {
-    $relative = [IO.Path]::GetRelativePath($PackageRoot, $_.FullName).Replace('\', '/')
+    $relative = (Get-PackageRelativePath $PackageRoot $_.FullName).Replace('\', '/')
     '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $relative
 })
-[IO.File]::WriteAllLines((Join-Path $PackageRoot 'SHA256SUMS.txt'), $manifest, [Text.UTF8Encoding]::new($false))
-Compress-Archive -LiteralPath $PackageRoot -DestinationPath $Archive -CompressionLevel Optimal
+# Write LF only: GNU sha256sum and WSL/Git Bash would otherwise treat the CR as part of the filename.
+$manifestText = ($manifest -join "`n") + "`n"
+[IO.File]::WriteAllText((Join-Path $PackageRoot 'SHA256SUMS.txt'), $manifestText, [Text.UTF8Encoding]::new($false))
+# Build the archive entry by entry: Compress-Archive on Windows PowerShell 5.1 stores
+# backslash separators, which is not the separator the ZIP format specifies.
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$archiveHandle = [IO.Compression.ZipFile]::Open($Archive, [IO.Compression.ZipArchiveMode]::Create)
+try {
+    $packageFolder = Split-Path -Leaf $PackageRoot
+    foreach ($file in Get-ChildItem -LiteralPath $PackageRoot -Recurse -File | Sort-Object FullName) {
+        $entryName = $packageFolder + '/' + (Get-PackageRelativePath $PackageRoot $file.FullName).Replace('\', '/')
+        $entry = $archiveHandle.CreateEntry($entryName, [IO.Compression.CompressionLevel]::Optimal)
+        $entryStream = $entry.Open()
+        try {
+            $source = [IO.File]::OpenRead($file.FullName)
+            try { $source.CopyTo($entryStream) } finally { $source.Dispose() }
+        } finally { $entryStream.Dispose() }
+    }
+} finally { $archiveHandle.Dispose() }
 Write-Host "Package: $Archive"
 Write-Host "SHA256: $((Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant())"
 Write-Host 'No Python environment, user data, packet captures or ONNX runtime is included.'
