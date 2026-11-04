@@ -342,7 +342,7 @@ fn reg(arguments: &[&str]) -> io::Result<()> {
 }
 
 fn copy_prefix(source: &Path, destination: &Path, length: u64) -> io::Result<()> {
-    let mut input = fs::File::open(source)?;
+    let input = fs::File::open(source)?;
     let mut output = fs::File::create(destination)?;
     let copied = io::copy(&mut input.take(length), &mut output)?;
     if copied != length {
