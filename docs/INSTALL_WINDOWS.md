@@ -49,8 +49,8 @@ ArgusNextPublic-windows-x64-setup.exe --verify           # re-check the embedded
 ## Uninstall
 
 Use **Settings → Apps → Argus Next Public**, or run the installed
-`argus-setup.exe --uninstall`. Uninstall removes the program, shortcuts, and the
-uninstall entry. It asks before deleting captured data and settings, and keeps
+`argus-uninstall.exe --uninstall` (the installer itself is not kept). Uninstall
+removes the program, shortcuts, and the uninstall entry. It asks before deleting captured data and settings, and keeps
 them by default. `--uninstall --silent` keeps data without asking.
 
 ## Verifying a download

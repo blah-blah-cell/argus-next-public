@@ -1,0 +1,11 @@
+Argus Next
+Copyright 2026 Argus Next contributors
+
+This product includes software developed by third parties. The portable package
+carries the notices that are required at runtime:
+
+- Three.js, MIT licensed: THIRD_PARTY/three-LICENSE.txt
+- Onboarding hero assets: THIRD_PARTY/hero-assets-NOTICE.md
+
+Model weights are distributed separately from the source license; see
+models/NOTICE.md.

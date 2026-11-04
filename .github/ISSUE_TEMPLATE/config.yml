@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/blah-blah-cell/argus-next-public/security/advisories/new
+    about: Report privately. Never post captures or credentials in a public issue.
+  - name: Build and install questions
+    url: https://github.com/blah-blah-cell/argus-next-public/blob/main/docs/INSTALL_WINDOWS.md
+    about: Start with the install guide and the build guide.

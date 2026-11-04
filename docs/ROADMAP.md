@@ -5,7 +5,11 @@ without a dedicated security team. It is deliberately conservative: nothing here
 is claimed as done until it has been built, tested on a clean machine, and
 shipped with an artifact you can verify.
 
-The Windows setup program is already shipped. Everything below is still ahead.
+The Windows setup program is already shipped, and the repository now carries an
+engineering baseline: a pinned toolchain, CI gates for formatting, clippy, tests,
+UI validation and release metadata, dependency/license/source policy, secret
+scanning, and tag-driven releases with checksums, an SBOM and build provenance.
+Those are recorded in `docs/adr/`. Everything else below is still ahead.
 
 ## Guiding constraints
 
@@ -16,20 +20,24 @@ The Windows setup program is already shipped. Everything below is still ahead.
 - Forecasts are research outputs, not validated attack detections.
 - A prototype that quietly overstates itself is worse than a small honest tool.
 
-## Phase 0 — Trust and supply chain (next, ~1–2 weeks)
+## Phase 0 — Trust and supply chain (in progress)
 
-Small, cheap work that unblocks pilot conversations.
+Delivered: root `LICENSE` (Apache-2.0) with model weights covered by a separate
+notice, `SECURITY.md` with scope and response windows, a `NOTICE` file, ADRs,
+and CI gates for formatting, clippy, Rust and installer tests, UI validation,
+release isolation, version/license consistency, dependency and license policy,
+and secret scanning. The release workflow now produces SHA-256 manifests, a
+CycloneDX SBOM and build provenance, with a guarded Authenticode step.
 
-- Root `LICENSE` for source and a separate, clearly worded license for model
-  weights. The workspace currently declares Apache-2.0 but ships no license text.
-- `SECURITY.md` with a disclosure address, scope, and a stated response window.
-- CycloneDX SBOM published beside each release, plus SHA-256 for every artifact.
-- CI that builds, runs the UI and release-isolation suites, `cargo test`,
-  `cargo clippy`, and refuses to publish on failure.
-- SPDX headers or a NOTICE file listing third-party components (Three.js is
-  already covered by `THIRD_PARTY/three-LICENSE.txt`).
+Remaining before pilot conversations:
+
+- Run the release workflow once and confirm the SBOM, checksums and provenance
+  are attached to a downloadable artifact.
+- Provision a signing certificate so Authenticode replaces the current
+  "publisher unknown" warning.
 - Threat model covering the elevated Pktmon sensor, the scheduled task, and the
   loopback IPC boundary.
+- Pin GitHub Actions to commit SHAs, with a reviewed update path.
 
 Exit criteria: a stranger can download a release, verify hashes, read the
 license, and report a vulnerability without asking a question.

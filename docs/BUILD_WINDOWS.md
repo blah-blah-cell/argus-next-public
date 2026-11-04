@@ -118,8 +118,9 @@ This creates `dist\ArgusNextPublic-windows-x64.zip` plus its staging directory.
 Only explicitly listed executables, the released checkpoint/manifest, Python
 source, setup/launch scripts, any supplied license and portable instructions are
 included. If present, the sanitized latest experimental checkpoint and v6.1 ONNX
-export are included with their manifests. Licensing still needs author
-confirmation; workspace metadata alone does not settle model-weight licensing.
+export are included with their manifests. Source and documentation are
+Apache-2.0 (see `LICENSE`); model weights are distributed separately for research
+and evaluation (see `models/NOTICE.md`).
 The embedded UI's vendored Three.js MIT license is copied separately to
 `THIRD_PARTY/three-LICENSE.txt` in every package.
 Python environments, captures, runtime data, caches and private files are not
@@ -132,3 +133,29 @@ To build the per-user setup program from that staging directory, run
 `.\scripts\build-installer.ps1`. It appends a hash-verified payload to a small
 stub executable; the result installs to `%LOCALAPPDATA%\Programs\ArgusNextPublic`
 and registers an uninstall entry. See [the install guide](INSTALL_WINDOWS.md).
+
+## Continuous integration
+
+`.github/workflows/ci.yml` is the enforcement layer. It runs four jobs on every
+push and pull request:
+
+| Job | Checks |
+| --- | --- |
+| Lint, UI, and metadata | `cargo fmt --check`, clippy with `-D warnings`, UI validation, release-isolation tests, version/license consistency |
+| Rust and installer tests | `cargo test --locked --workspace --all-targets`, setup-program unit tests |
+| Research code hygiene | Ruff syntax/undefined-name checks, byte-compilation |
+| Supply chain | `cargo-deny` advisories/bans/licenses/sources, secret scanning |
+
+On `main` and on manual dispatch it also builds the release binaries, packages
+them, builds the setup program, and runs
+`scripts/test-installer.ps1` — verify, silent install into a temp directory,
+assert the file set, silent uninstall, assert the directory is gone.
+
+Tagging a commit `v*` drives `.github/workflows/release.yml`: tests, build,
+package, setup program, installer smoke test, optional Authenticode signing when
+certificate secrets exist, SHA-256 manifests, a CycloneDX SBOM, build provenance,
+and the GitHub release itself.
+
+Run `node scripts/check-release-metadata.cjs` after changing any version. It
+asserts that the crates, `tauri.conf.json`, the installer crate, the pinned
+toolchain, and `CHANGELOG.md` agree.
