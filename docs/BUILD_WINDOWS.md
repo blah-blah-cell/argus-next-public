@@ -120,6 +120,8 @@ source, setup/launch scripts, any supplied license and portable instructions are
 included. If present, the sanitized latest experimental checkpoint and v6.1 ONNX
 export are included with their manifests. Licensing still needs author
 confirmation; workspace metadata alone does not settle model-weight licensing.
+The embedded UI's vendored Three.js MIT license is copied separately to
+`THIRD_PARTY/three-LICENSE.txt` in every package.
 Python environments, captures, runtime data, caches and private files are not
 copied. Every included file has a SHA-256 entry in `SHA256SUMS.txt`. The script
 also prints the ZIP hash. It refuses existing output; choose a fresh

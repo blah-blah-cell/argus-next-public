@@ -46,6 +46,8 @@ Licensing is pending the author's confirmation. The source workspace metadata
 declares Apache-2.0, but no root license text or separate model-weight license was
 provided at preparation time. Do not assume that declaration grants blanket
 redistribution rights for all source, weights, or third-party dependencies.
+The embedded Three.js UI dependency retains its separate MIT notice at
+`THIRD_PARTY/three-LICENSE.txt`.
 
 For a model-free synthetic CLI check (does not capture traffic):
 

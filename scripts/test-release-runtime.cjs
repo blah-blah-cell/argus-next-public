@@ -43,3 +43,8 @@ test('release resource discovery embeds no developer checkout path', () => {
   assert.doesNotMatch(discovery, /current_dir\(\)/);
   assert.match(discovery, /directory\.to_path_buf\(\)/);
 });
+
+test('portable packaging retains the embedded Three.js license notice', () => {
+  assert.match(read('scripts/package-windows.ps1'), /'desktop\/ui\/vendor\/three\/LICENSE' = 'THIRD_PARTY\/three-LICENSE\.txt'/);
+  assert.match(read('desktop/ui/vendor/three/LICENSE'), /The MIT License/);
+});
