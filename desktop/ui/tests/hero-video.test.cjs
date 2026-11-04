@@ -58,9 +58,11 @@ test('dispose cancels frames, removes listeners and releases the media resource'
   assert.equal(f.stats().loads,1);assert.equal(f.stats().removed,true);
   f.controller.setEnabled(true);assert.equal(f.stats().plays,1);
 });
-test('public scene uses independent procedural geometry',()=> {
-  const scene=fs.readFileSync(path.join(__dirname,'../spatial/scene.mjs'),'utf8');
-  assert.match(scene,/original-hero\.mjs/);
+test('local video/poster bytes match provenance and generated imagery is not telemetry',()=> {
+  const assets=path.join(__dirname,'../spatial/assets'),record=JSON.parse(fs.readFileSync(path.join(assets,'PACKET_VIDEO.json')));
+  for(const [name,key] of [['packet-reflection.mp4','video_sha256'],['packet-reflection-poster.jpg','poster_sha256']])
+    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(assets,name))).digest('hex'),record[key]);
+  assert.match(record.purpose,/Never observed telemetry/);assert.equal(record.duration_seconds,10);
 });
 test('renderer binds directional video optics and pauses on reduced motion and all scene gates',()=> {
   const read=name=>fs.readFileSync(path.join(__dirname,'../spatial',name),'utf8');

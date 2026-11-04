@@ -108,15 +108,18 @@ test('server fails an occupied port and releases its listener on close',async t=
   const replacement=await startDevServer({root:development.root,port});
   await replacement.close();
 });
-test('public UI and procedural hero module load',async t=>{
+test('real cinematic UI, module, geometry and video range load without source changes',async t=>{
   const root=path.join(projectRoot,'desktop/ui');
   const development=await startDevServer({root,port:0});
   t.after(()=>development.close());
-  for(const resource of ['/','/app.js','/styles.css','/spatial/original-hero.mjs']) {
+  for(const resource of ['/','/app.js','/styles.css','/spatial/assets/hero-a.geometry.json']) {
     const result=await get(development.url+resource);
     assert.equal(result.status,200,resource);
     assert.ok(result.body.length>100,resource);
   }
+  const video=await get(development.url+'/spatial/assets/packet-reflection.mp4',{headers:{range:'bytes=0-31'}});
+  assert.equal(video.status,206); assert.equal(video.headers['content-length'],'32');
+  assert.equal(video.headers['content-type'],'video/mp4');
 });
 test('a junction or symlink cannot expose assets outside the UI root',async t=>{
   const development=await fixture(t);

@@ -1,0 +1,12 @@
+{
+  "purpose":"Illustrative packet motion reflected/refracted inside the decorative hero. Never observed telemetry.",
+  "source":"User-supplied generated video from Downloads: Glassmorphic_objects_moving_in_loop_20261017230621.mp4",
+  "source_sha256":"184333f2c46d0265655f56f56fc99b7f944f5720f59094432c77ff93bafc02fa",
+  "processing":"Top-aligned 1920x864 wide crop of the supplied 1920x1080 clip, resize 1280x576, H.264 CRF22 yuv420p, faststart, no audio; original unchanged.",
+  "duration_seconds":10,
+  "fps":24,
+  "video_sha256":"bb3300c318b6f1860061944f73f7c40d9583cf4b9c98de45d8815134ef40adfa",
+  "poster_sha256":"0e28a436eb7f0e13ac2aaa8d84efe56dccc48317e427232570ecc71aaecee8f3",
+  "poster_timestamp_seconds":1.2,
+  "mapping":"World-direction virtual lightbox; not a real 360-degree capture or DOM overlay."
+}

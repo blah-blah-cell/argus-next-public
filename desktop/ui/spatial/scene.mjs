@@ -1,5 +1,5 @@
 import { clampCamera, pixelRatio, storyPose } from './core.mjs?v=room-orbit-1';
-import {createHeroA} from './original-hero.mjs';
+import {createHeroA} from './hero-a.mjs?v=roughness-2';
 import {createHeroStage} from './hero-stage.mjs?v=room-orbit-1';
 
 export async function createScene(canvas, onStatus) {
@@ -56,7 +56,7 @@ export async function createScene(canvas, onStatus) {
     try { hero.prepare(scene,camera);renderer.render(scene,camera); }
     catch (error) { lost=true;syncHero();onStatus('failed');return; }
     canvas.dataset.frames=String(++paintCount);
-    canvas.dataset.hero='procedural';
+    canvas.dataset.hero='reference-glass';
     if (!painted) { painted=true; onStatus('webgl'); }
     if(moving)invalidate();
   }
