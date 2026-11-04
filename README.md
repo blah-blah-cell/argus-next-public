@@ -1,21 +1,21 @@
 # Argus Next
 
-Argus Next is an early-stage Windows network-monitoring research prototype. It is intended to help operators inspect local network activity and investigate alerts. It is not a managed security service or a replacement for an established security program.
+Argus Next is a Windows app I'm building to make network activity easier to inspect. It brings packet capture, flow information and alerts into one place. I'm especially interested in whether a tool like this could be useful to smaller organizations that don't have a dedicated security team.
 
-## What is being explored
+## What it does
 
-The desktop application brings together packet capture, flow views, replay and temporal models. One research component, Adaptive Hierarchical Event Memory (AHEM), forecasts packet characteristics using recent traffic and previously observed flow transitions. A forecast is not an intrusion verdict.
+The app can capture traffic, show network flows and replay packet captures. It also includes models that forecast packet behavior. One of them, Adaptive Hierarchical Event Memory (AHEM), is the focus of my research into how a small model can use a flow's earlier history.
 
-The system is under active development. Its effectiveness at detecting attacks in an organization's network, its false-alert rate and its suitability for production remain to be evaluated in an authorized pilot.
+A forecast isn't the same thing as detecting an attack. Argus is still a prototype: I haven't yet established how well it detects threats in an organization's network or how often it produces false alerts. Please don't rely on it as your only security tool.
 
 ## Privacy and pilots
 
-Network metadata can be sensitive even when packet payloads are not retained. Before any pilot, the operator and organization should agree in writing on capture scope, access permissions, retention, exports and incident handling. Do not capture traffic without authorization.
+I'm interested in working with organizations that would like to explore a pilot. Before any capture, we'd agree on what traffic can be monitored, who can access the data, how long it's kept and how findings are handled. Network metadata can be sensitive; only capture traffic you have permission to monitor.
 
 ## Availability
 
-This repository is a public project overview, not an installer or a production release. Installation instructions, source-code release terms and support arrangements are being reviewed.
+This repository currently contains a project overview. The application source, model files and installation instructions are being prepared for release; there isn't an installer here yet.
 
 ## Research
 
-See [Research overview](research/README.md). Research benchmarks evaluate forecasting under defined conditions; they do not measure the app's ability to protect an organization.
+The [research overview](research/README.md) explains what AHEM has been tested on and what those tests can—and can't—tell us.
