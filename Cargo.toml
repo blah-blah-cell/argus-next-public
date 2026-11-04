@@ -1,0 +1,25 @@
+[workspace]
+members = [
+    "crates/argus-capture",
+    "crates/argus-core",
+    "crates/argus-detector",
+    "crates/argus-features",
+    "crates/argus-inference",
+    "crates/argus-model-artifact",
+    "crates/argus-moe",
+    "crates/argus-nids",
+    "desktop/src-tauri",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0"
+rust-version = "1.96"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }

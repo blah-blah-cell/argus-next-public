@@ -1,0 +1,55 @@
+/* The complete setup stays in one pinned scene. Only the page supplies progress. */
+.journey-band,.journey-anchor{position:absolute;left:0;width:1px;pointer-events:none}
+.journey-band-welcome{top:50svh;height:calc((100% - 100svh)*.17)}
+.journey-band-memory{top:calc((100% - 100svh)*.17 + 50svh);height:calc((100% - 100svh)*.16)}
+.journey-band-evidence{top:calc((100% - 100svh)*.33 + 50svh);height:calc((100% - 100svh)*.2228)}
+.journey-band-privacy{top:calc((100% - 100svh)*.5528 + 50svh);height:calc((100% - 100svh)*.156)}
+.journey-band-checks{top:calc((100% - 100svh)*.7088 + 50svh);height:calc((100% - 100svh)*.156)}
+.journey-band-start{top:calc((100% - 100svh)*.8648 + 50svh);height:calc((100% - 100svh)*.1352 + 50svh)}
+.journey-anchor{height:1px}
+.journey-anchor-network{top:calc((100% - 100svh)*.10)}
+.journey-anchor-memory{top:calc((100% - 100svh)*.25)}
+.journey-anchor-evidence{top:calc((100% - 100svh)*.41)}
+.journey-anchor-privacy{top:calc((100% - 100svh)*.6256)}
+.journey-anchor-checks{top:calc((100% - 100svh)*.7868)}
+.journey-anchor-start{top:calc((100% - 100svh)*.948)}
+.journey-cinematic .intro-visual-story.scroll-story{height:1000svh}
+.journey-cinematic .spatial-pin{perspective:1600px}
+.journey-cinematic .spatial-narrative{transform-origin:50% 50%;transform-style:preserve-3d}
+.journey-cinematic .spatial-narrative>div{transform-origin:0% 50%;text-shadow:0 2px 18px #050608}
+.journey-cinematic .journey-fallback-copy{display:none}
+.journey-cinematic .spatial-network-copy{animation:journey-network 1s linear both;animation-timeline:--argus-journey;animation-range:contain 0% contain 100%}
+.journey-cinematic .spatial-memory-copy{animation-name:journey-memory}
+.journey-cinematic .spatial-evidence-copy{animation-name:journey-evidence}
+@keyframes journey-network{0%{opacity:0;transform:perspective(1600px) translate3d(42vw,0,-380px) rotateY(-55deg)}8%,14%{opacity:1;transform:perspective(1600px) translate3d(0,0,0) rotateY(0deg)}17%,100%{opacity:0;transform:perspective(1600px) translate3d(-42vw,0,-380px) rotateY(55deg)}}
+@keyframes journey-memory{0%,17%{opacity:0;transform:perspective(1600px) translate3d(42vw,0,-380px) rotateY(-55deg)}22%,30%{opacity:1;transform:perspective(1600px) translate3d(0,0,0) rotateY(0deg)}33%,100%{opacity:0;transform:perspective(1600px) translate3d(-42vw,0,-380px) rotateY(55deg)}}
+@keyframes journey-evidence{0%,33%{opacity:0;transform:perspective(1600px) translate3d(42vw,0,-380px) rotateY(-55deg)}38%,46%{opacity:1;transform:perspective(1600px) translate3d(0,0,0) rotateY(0deg)}53%,100%{opacity:0;transform:perspective(1600px) translate3d(-42vw,0,-380px) rotateY(55deg)}}
+.journey-cinematic[data-setup-stage="welcome"] #onboarding-dialog{visibility:hidden}
+.journey-cinematic #onboarding-dialog:not([hidden]){position:absolute!important;inset:0!important;padding:0!important;margin:0!important;background:transparent!important;pointer-events:none;transform-style:preserve-3d}
+.journey-cinematic #onboarding-dialog .onboarding-head{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%)}
+.journey-cinematic #onboarding-dialog .onboarding-progress{position:absolute;left:53%;right:36px;top:92px;margin:0;padding:0;border:0;z-index:4;pointer-events:auto;gap:6px}
+.journey-cinematic #onboarding-dialog .onboarding-progress button{padding:8px 11px;font-size:11px;background:#080a0f;border-color:#383d49;white-space:nowrap}
+.journey-cinematic #onboarding-dialog .onboarding-progress button[aria-current="step"]{border-color:#9dd5c9;color:#c7eee5}
+.journey-cinematic #onboarding-dialog .onboarding-step{position:absolute;top:150px;left:53%;right:36px;bottom:64px;min-height:0;max-width:none;margin:0;padding:0 10px 12px 0;border:0;justify-content:flex-start;overflow-y:auto;transform-origin:0% 50%;animation:none;pointer-events:none;opacity:0;scrollbar-width:thin}
+.journey-cinematic #onboarding-dialog .onboarding-step[data-active="true"]{pointer-events:auto}
+.journey-cinematic #onboarding-dialog h3{font-size:clamp(26px,3.2vw,48px);margin:14px 0 24px;max-width:520px}
+.journey-cinematic #onboarding-dialog .onboarding-facts{grid-template-columns:1fr;gap:0;margin-top:14px}
+.journey-cinematic #onboarding-dialog .onboarding-facts article{padding:12px 0;border-top:1px solid #282d36}
+.journey-cinematic #onboarding-dialog .onboarding-facts article strong{font-size:13px}
+.journey-cinematic #onboarding-dialog .onboarding-facts p{font-size:12px;margin:6px 0 0;line-height:1.5}
+.journey-cinematic #onboarding-dialog .onboarding-callout,.journey-cinematic #onboarding-dialog .onboarding-final-card,.journey-cinematic #onboarding-dialog .onboarding-preference{padding:14px;border-color:#343a45;background:#090c13}
+.journey-cinematic #onboarding-dialog .onboarding-check{padding:12px 0}
+.journey-cinematic #onboarding-dialog .onboarding-checks strong{font-size:13px}
+.journey-cinematic #onboarding-dialog .onboarding-check small{font-size:12px}
+.journey-cinematic #onboarding-dialog .onboarding-step-title small{color:#adb5c3;letter-spacing:0;text-transform:none}
+.journey-cinematic #onboarding-dialog .onboarding-actions{padding:18px 0 0;margin:0;max-width:none;pointer-events:auto;gap:12px}
+.journey-cinematic #onboarding-dialog .onboarding-actions>div{gap:8px}
+.journey-cinematic #onboarding-dialog .onboarding-actions .button{font-size:12px;padding:10px 13px}
+.journey-cinematic #onboarding-dialog .onboarding-footnote{font-size:12px;line-height:1.6}
+.journey-cinematic .spatial-enter{right:auto;left:32px}
+.journey-cinematic .spatial-scroll-cue{bottom:74px}
+.journey-cinematic[data-setup-stage="welcome"] #onboarding-dialog .onboarding-progress{opacity:.65}
+.journey-cinematic:not([data-setup-stage="welcome"]) .spatial-mode>[data-workspace-jump]{display:none}
+.journey-cinematic[data-setup-stage="2"] .spatial-enter{display:none}
+@media(max-width:900px){.journey-cinematic #onboarding-dialog .onboarding-progress{left:48%;right:20px}.journey-cinematic #onboarding-dialog .onboarding-step{left:48%;right:20px}.journey-cinematic #onboarding-dialog h3{font-size:28px}}
+@media(max-height:650px){.journey-cinematic #onboarding-dialog .onboarding-step{top:125px;bottom:36px}.journey-cinematic #onboarding-dialog .onboarding-progress{top:80px}}

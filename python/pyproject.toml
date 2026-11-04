@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "argus-research"
+version = "0.1.0"
+description = "Research-side validation tools and model-artifact contracts for Argus Next."
+requires-python = ">=3.11,<3.14"
+dependencies = ["torch==2.7.1", "numpy>=1.26,<3"]
+
+[project.optional-dependencies]
+export = ["onnx==1.22.0", "onnxruntime==1.29.0"]
+laya-router = [
+    "laya==0.3.4",
+    "safetensors>=0.4.5,<1",
+    "transformers>=4.48,<5",
+]
+real-data = ["dpkt==1.9.8", "numpy", "pandas", "scikit-learn", "torch"]
+dev = [
+    "dpkt==1.9.8",
+    "numpy",
+    "pandas",
+    "pytest>=8,<10",
+    "ruff==0.12.12",
+    "scikit-learn",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

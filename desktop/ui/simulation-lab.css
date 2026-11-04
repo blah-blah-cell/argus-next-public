@@ -1,0 +1,26 @@
+.simulation-panel .panel-heading{flex-wrap:wrap;gap:16px;align-items:flex-start}
+.simulation-panel .simulation-controls{display:flex;gap:8px;flex-wrap:wrap}
+.sim-workbench-controls{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:16px 0}
+.sim-workbench-controls label{display:flex;align-items:center;gap:12px;font-size:13px}
+#sim-packet-count{width:90px;padding:8px;background:var(--input-bg);border:1px solid var(--input-border);color:var(--text);border-radius:6px;font-variant-numeric:tabular-nums}
+#sim-count-help,.sim-history>p,#sim-evidence-summary{font-size:12px;line-height:1.5;color:var(--text-dim)}
+#sim-lab-status{font-size:13px;line-height:1.5;color:var(--text);overflow-wrap:anywhere}
+#sim-run-queue{padding-left:20px;font-size:12px;color:var(--text-dim);line-height:1.8}
+#sim-run-queue:empty{display:none}
+.simulation-panel .simulation-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.simulation-panel .simulation-card{background:var(--panel-card);border:1px solid var(--line-card);box-shadow:none;transform:none;gap:12px}
+.simulation-panel .simulation-card h3{font-size:14px;line-height:1.4;text-wrap:balance}
+.simulation-panel .sim-description{font-size:12px;line-height:1.6;color:var(--text-dim);text-wrap:pretty}
+.simulation-panel .sim-tactic-pill{background:var(--panel-card-2);color:var(--text-dim);border-color:var(--line-card);white-space:normal}
+.simulation-panel .sim-technique-row{font-size:11px;color:var(--text-dim)}
+.sim-history{margin-top:24px;border-top:1px solid var(--line-card);padding-top:16px}
+.sim-history h3,.simulation-status-card h3{font-size:14px}
+#sim-run-history{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+#sim-run-history button{width:100%;justify-content:flex-start;text-align:left;white-space:normal}
+#sim-run-history button[aria-pressed="true"]{border-color:var(--line-focus)}
+.sim-evidence-scroll{overflow-x:auto;max-height:360px}
+.sim-evidence-table{width:100%;border-collapse:collapse;font-size:12px;text-align:left;font-variant-numeric:tabular-nums}
+.sim-evidence-table caption{text-align:left;color:var(--text-dim);padding:10px 0}
+.sim-evidence-table th,.sim-evidence-table td{padding:10px;border-bottom:1px solid var(--line-card);vertical-align:top;overflow-wrap:anywhere}
+.sim-evidence-table details{min-width:180px}.sim-evidence-table summary{cursor:pointer}
+.simulation-panel button:focus-visible,#sim-packet-count:focus-visible,.sim-evidence-table summary:focus-visible{outline:2px solid var(--line-focus);outline-offset:3px}

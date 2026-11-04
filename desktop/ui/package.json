@@ -1,0 +1,8 @@
+{
+  "name": "argus-desktop-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local static Tauri UI; Node is used for development checks only.",
+  "engines": { "node": ">=22" },
+  "scripts": { "validate": "node ../../scripts/validate-desktop-ui.cjs" }
+}

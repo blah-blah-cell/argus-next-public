@@ -1,0 +1,16 @@
+{
+  "artifact_sha256": "2457076fd716e4c342c2d359e0046b46ea574aa79ce4a596c2291c2e87943c9e",
+  "cache_scope_requirement": "stable opaque flow identity within one capture",
+  "feature_schema": "packet-causal-flow-v2",
+  "final_result_sha256": "fbb468ad92c54a98a6a94754458ff44cd21b944a146604959f3b8402e7e00a9a",
+  "model_id": "argus.ahem-v6.1.state-transition-forecaster",
+  "model_implementation_files": [
+    "ahem_v3.py",
+    "ahem_v4.py",
+    "ahem_v6.py"
+  ],
+  "model_implementation_sha256": "0cf2466fc7e0ea1ed33b6062eac4f7382c5522eb398eea2f738ef4fb2f1eea9f",
+  "schema": "argus.ahem-v6-runtime-manifest/v1",
+  "security_detector": false,
+  "source_checkpoint_sha256": "0edff7f3be0045d82f6ae3e682393965a8942501102ed4fd2d84cdad5e56ad89"
+}

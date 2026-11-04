@@ -1,0 +1,26 @@
+[package]
+name = "argus-desktop"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+argus-capture = { path = "../../crates/argus-capture" }
+argus-core = { path = "../../crates/argus-core" }
+argus-detector = { path = "../../crates/argus-detector" }
+argus-inference = { path = "../../crates/argus-inference" }
+argus-nids = { path = "../../crates/argus-nids" }
+csv = "1.4.0"
+dunce = "1.0.5"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.145"
+sha2 = "0.10.9"
+tauri = { version = "2.11.5", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
+
+[lints]
+workspace = true

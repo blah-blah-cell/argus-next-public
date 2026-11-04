@@ -1,0 +1,211 @@
+{
+  "architecture": "ahem-v6.1-bounded-causal-state-transition-memory",
+  "architecture_metadata": {
+    "key_dim": 32,
+    "local_packets": 128,
+    "loss": "(smooth_l1(log_length)+4*smooth_l1(log_per_flow_interarrival))/5",
+    "max_transitions": 16,
+    "maximum_context_packets": 10000,
+    "minimum_completed_transitions": 2,
+    "output_dim": 2,
+    "packet_dim": 12,
+    "parameters": 40851,
+    "selected_best_epoch": 48,
+    "selected_seed": 20260906,
+    "selection": "lowest development validation loss before final holdout access",
+    "width": 60
+  },
+  "artifact_sha256": "145891c73f42b667fae58894226647a7ad51c066d23d9e01881e031a5ed43234",
+  "calibrated_security_verdict": false,
+  "calibration": {
+    "reference": null,
+    "required": false
+  },
+  "feature_contract_sha256": "3c48a46921c141ec7f813aeb38231eee70db28d90255cc1ff3bc53898ac2b01b",
+  "feature_schema": "packet-causal-flow-v2",
+  "feature_schema_id": "packet-causal-flow-v2",
+  "feature_schema_version": 1,
+  "final_result_sha256": "fbb468ad92c54a98a6a94754458ff44cd21b944a146604959f3b8402e7e00a9a",
+  "format": "argus-model-artifact",
+  "format_version": 1,
+  "model_id": "argus.ahem-v6.1.state-transition-forecaster",
+  "model_implementation_files": [
+    "ahem_v3.py",
+    "ahem_v4.py",
+    "ahem_v6.py"
+  ],
+  "model_implementation_sha256": "0cf2466fc7e0ea1ed33b6062eac4f7382c5522eb398eea2f738ef4fb2f1eea9f",
+  "model_version": "6.1.0",
+  "parity_verification": {
+    "batch_errors": {
+      "1": {
+        "memory_gate": 2.9802322387695312e-08,
+        "prediction": 5.587935447692871e-09,
+        "retrieval_weights": 1.7881393432617188e-07
+      },
+      "2": {
+        "memory_gate": 1.1920928955078125e-07,
+        "prediction": 2.384185791015625e-07,
+        "retrieval_weights": 2.682209014892578e-07
+      },
+      "4": {
+        "memory_gate": 2.9802322387695312e-08,
+        "prediction": 3.5762786865234375e-07,
+        "retrieval_weights": 1.1920928955078125e-07
+      }
+    },
+    "max_abs_error": 3.5762786865234375e-07,
+    "tolerance": 0.0001,
+    "verified": true
+  },
+  "provenance": {
+    "checkpoint_sha256": "2457076fd716e4c342c2d359e0046b46ea574aa79ce4a596c2291c2e87943c9e",
+    "evaluation_reference": "unverified:final-result-sha256:fbb468ad92c54a98a6a94754458ff44cd21b944a146604959f3b8402e7e00a9a",
+    "source_revision": "seed-20260906-epoch-48",
+    "training_dataset_reference": "unverified:checkpoint-sha256:2457076fd716e4c342c2d359e0046b46ea574aa79ce4a596c2291c2e87943c9e",
+    "verified": false
+  },
+  "readiness": {
+    "maximum_age_seconds": null,
+    "minimum_observations": 128
+  },
+  "runtime": {
+    "dynamic_axes": [
+      "batch"
+    ],
+    "minimum_runtime_version": "1.20.0",
+    "opset_version": 17,
+    "precision": "float32",
+    "quantization": "none",
+    "runtime_id": "onnxruntime",
+    "supported_targets": [
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu"
+    ]
+  },
+  "runtime_adapter": "argus.causal-flow/v1",
+  "schema": "argus.ahem-v61-onnx-manifest/v1",
+  "security_detector": false,
+  "source_checkpoint_sha256": "2457076fd716e4c342c2d359e0046b46ea574aa79ce4a596c2291c2e87943c9e",
+  "task": "next_same_flow_dynamic_event_forecast_only",
+  "tensor_contract": {
+    "inputs": {
+      "anchor_ordinals": {
+        "description": "Query anchor ordinal for relative recency computation",
+        "dtype": "int64",
+        "shape": [
+          "batch"
+        ]
+      },
+      "context_spans": {
+        "description": "Active horizon context span for recency normalization",
+        "dtype": "float32",
+        "shape": [
+          "batch"
+        ]
+      },
+      "keys": {
+        "description": "Projected transition state keys",
+        "dtype": "float32",
+        "shape": [
+          "batch",
+          16,
+          32
+        ]
+      },
+      "local_packets": {
+        "description": "Local causal packet feature window",
+        "dtype": "float32",
+        "shape": [
+          "batch",
+          128,
+          12
+        ]
+      },
+      "query_current": {
+        "description": "Current packet features in query flow",
+        "dtype": "float32",
+        "shape": [
+          "batch",
+          12
+        ]
+      },
+      "query_gap": {
+        "description": "Normalized gap between query predecessor and current",
+        "dtype": "float32",
+        "shape": [
+          "batch"
+        ]
+      },
+      "query_predecessor": {
+        "description": "Predecessor packet features in query flow",
+        "dtype": "float32",
+        "shape": [
+          "batch",
+          12
+        ]
+      },
+      "source_ordinals": {
+        "description": "Global packet sequence ordinals of transition sources",
+        "dtype": "int64",
+        "shape": [
+          "batch",
+          16
+        ]
+      },
+      "successor_dynamic": {
+        "description": "Dynamic successor ground truth targets",
+        "dtype": "float32",
+        "shape": [
+          "batch",
+          16,
+          2
+        ]
+      },
+      "valid": {
+        "description": "Boolean mask indicating valid transition slots",
+        "dtype": "bool",
+        "shape": [
+          "batch",
+          16
+        ]
+      },
+      "values": {
+        "description": "Projected transition values",
+        "dtype": "float32",
+        "shape": [
+          "batch",
+          16,
+          60
+        ]
+      }
+    },
+    "outputs": {
+      "memory_gate": {
+        "description": "Learned interpolation weight for retrieved memory",
+        "dtype": "float32",
+        "shape": [
+          "batch",
+          1
+        ]
+      },
+      "prediction": {
+        "description": "Predicted next packet log-length and log-interarrival",
+        "dtype": "float32",
+        "shape": [
+          "batch",
+          2
+        ]
+      },
+      "retrieval_weights": {
+        "description": "Attention weights over valid cached transitions",
+        "dtype": "float32",
+        "shape": [
+          "batch",
+          16
+        ]
+      }
+    }
+  },
+  "training_source_checkpoint_sha256": "0edff7f3be0045d82f6ae3e682393965a8942501102ed4fd2d84cdad5e56ad89"
+}

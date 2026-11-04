@@ -1,0 +1,13 @@
+[package]
+name = "argus-detector"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+argus-core = { path = "../argus-core" }
+argus-features = { path = "../argus-features" }
+
+[lints]
+workspace = true

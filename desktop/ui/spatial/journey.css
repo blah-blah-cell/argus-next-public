@@ -1,0 +1,57 @@
+/* One document, one scroll surface. Setup is not a dialog or nested scroller. */
+html.journey-pending body{background:#050608}
+html.journey-pending .shell{visibility:hidden}
+body.journey-active{background:#050608;color:#eef0f5}
+body.journey-active .sidebar{display:none}
+body.journey-active .shell>main{padding:0;margin:0;width:100%;max-width:none}
+body.journey-active .shell>main>:not(#spatial-workspace){display:none!important}
+body.journey-active #spatial-workspace{margin:0;max-width:none;--text:#eef0f5;--text-heading:#fff;--text-dim:#bbc2ce;--muted:#adb5c3;--line-card:#343841;--line-subtle:#242831;--panel-card:#101319;--line-focus:#9dd5c9}
+.journey-active .intro-visual-story{position:relative}
+.journey-active .intro-visual-story.scroll-story{height:340svh;view-timeline-name:--argus-journey;view-timeline-axis:block}
+.journey-active .spatial-pin{height:100svh;min-height:600px;top:0}
+.journey-active .scroll-story .spatial-pin{position:sticky;top:0}
+.journey-active .spatial-tools,.journey-active .spatial-foot{display:none}
+.journey-active .spatial-caption{bottom:100px}
+.journey-active .spatial-heading{padding-top:env(safe-area-inset-top)}
+.journey-active .spatial-enter{bottom:32px}
+#spatial-workspace #onboarding-dialog:not([hidden]){position:relative;display:block;inset:auto;transform:none;width:100%;max-width:none;max-height:none;margin:0;padding:0 clamp(24px,7vw,120px) 80px;box-sizing:border-box;background:#050608;color:#eef0f5;border:0;border-radius:0;box-shadow:none;overflow:visible;z-index:auto}
+#spatial-workspace #onboarding-dialog{backdrop-filter:none;-webkit-backdrop-filter:none}
+.journey-active .scroll-story .spatial-caption{animation:spatial-cue-out 1s linear both;animation-timeline:--argus-journey;animation-range:contain 0% contain 100%}
+.journey-active #spatial-title:focus{outline:none}
+#onboarding-dialog .onboarding-head{max-width:1000px;margin:0 auto;padding:72px 0 24px;border:0;align-items:flex-start}
+#onboarding-dialog .onboarding-head h2{font-size:clamp(30px,5vw,68px);font-weight:500;line-height:1.08;max-width:850px;text-wrap:balance}
+#onboarding-dialog .onboarding-head p{font-size:15px;line-height:1.6;color:#adb5c3;margin-top:16px}
+#onboarding-dialog .onboarding-mark{display:none}
+#onboarding-dialog .onboarding-progress{max-width:1000px;margin:0 auto;padding:16px 0 24px;gap:12px;flex-wrap:wrap;border-bottom:1px solid #343841}
+#onboarding-dialog .onboarding-progress i{display:none}
+#onboarding-dialog .onboarding-progress button{color:#d8dde6;background:transparent;border:1px solid #343841;border-radius:5px;padding:10px 16px;cursor:pointer}
+#onboarding-dialog .onboarding-step{max-width:1000px;min-height:65svh;box-sizing:border-box;padding:80px 0;margin:0 auto;scroll-margin-top:32px;display:flex;flex-direction:column;justify-content:center;border-bottom:1px solid #242831}
+.journey-step-number{font:12px ui-monospace,Consolas,monospace;color:#9dd5c9}
+#onboarding-dialog h3{font-size:clamp(28px,4vw,50px);font-weight:500;line-height:1.15;margin:18px 0 32px;text-wrap:balance}
+#onboarding-dialog .onboarding-facts{margin-top:24px;gap:24px}
+#onboarding-dialog .onboarding-facts article{padding:20px 0;border:0;border-radius:0;background:transparent}
+#onboarding-dialog .onboarding-facts p{font-size:14px;line-height:1.65;color:#adb5c3}
+#onboarding-dialog .onboarding-callout,#onboarding-dialog .onboarding-final-card,#onboarding-dialog .onboarding-preference{border-radius:8px;background:#101319;padding:20px}
+#onboarding-dialog .onboarding-checks{max-height:none;overflow:visible;gap:0}
+#onboarding-dialog .onboarding-check{background:transparent;border:0;border-bottom:1px solid #242831;border-radius:0;padding:18px 0}
+#onboarding-dialog .onboarding-check small{color:#adb5c3;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+#onboarding-dialog .onboarding-readiness-summary{color:#c6d1df;margin-top:20px;font-size:14px;line-height:1.6}
+#onboarding-dialog .onboarding-actions{max-width:1000px;margin:0 auto;padding:32px 0;gap:20px;flex-wrap:wrap;border:0;background:transparent;position:relative}
+#onboarding-dialog .onboarding-actions>div{display:flex;gap:12px;flex-wrap:wrap}
+#onboarding-finish-status{flex-basis:100%;color:#e8c7a4;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+#onboarding-finish-status:empty{display:none}
+#onboarding-dialog .onboarding-actions .button,#onboarding-dialog #onboarding-refresh{background:#eef0f5;color:#14171d;border:1px solid #eef0f5;box-shadow:none;padding:13px 20px}
+#onboarding-dialog .onboarding-actions .secondary,#onboarding-dialog #onboarding-refresh{background:transparent;color:#eef0f5;border-color:#59616e}
+#onboarding-dialog .onboarding-skip{color:#aeb7c5}
+#onboarding-dialog .onboarding-pulse{animation:none}
+#onboarding-dialog button:focus-visible,#onboarding-dialog input:focus-visible{outline:2px solid #9dd5c9;outline-offset:5px}
+.journey-fallback-copy{padding:48px 24px;color:#d5dae3;max-width:1000px;margin:auto}
+.journey-fallback-copy h3{font-size:28px;font-weight:500}.journey-fallback-copy p{line-height:1.7;color:#adb5c3}
+.intro-visual-story.scroll-story+.journey-fallback-copy{display:none}
+@supports(animation-timeline:view()){
+  #onboarding-dialog .onboarding-step{animation:journey-section-in linear both;animation-timeline:view();animation-range:entry 0% entry 65%}
+}
+@keyframes journey-section-in{from{opacity:.5;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+html[data-motion="reduced"] #onboarding-dialog .onboarding-step{animation:none}
+@media(prefers-reduced-motion:reduce){#onboarding-dialog .onboarding-step{animation:none}}
+@media(max-width:700px){#onboarding-dialog .onboarding-facts{grid-template-columns:1fr;gap:0}#onboarding-dialog .onboarding-step{min-height:auto;padding:56px 0}#onboarding-dialog .onboarding-head{padding-top:48px}.journey-active .spatial-mode{flex-wrap:wrap;justify-content:flex-end}.journey-active .spatial-caption{bottom:95px}}

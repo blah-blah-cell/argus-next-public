@@ -1,0 +1,238 @@
+/* Daily workspace. The cinematic introduction owns its own palette and motion. */
+.spatial-app:not(.on-landing) {
+  --bg: #101313;
+  --panel: #171b1b;
+  --panel-card: #1b2020;
+  --panel-card-2: #131717;
+  --panel-card-3: #1c2221;
+  --text: #e7ece9;
+  --text-heading: #f0f3ef;
+  --text-dim: #bdcac5;
+  --text-mono: #c8d8d1;
+  --muted: #9aa9a3;
+  --eyebrow: #a0b0a8;
+  --line: #303b36;
+  --line-subtle: #27302c;
+  --line-card: #303b36;
+  --line-focus: #a4e0b5;
+  --cyan: #a4e0b5;
+  --amber: #efbd64;
+  --sp-accent: #a4e0b5;
+  --nav-hover-bg: #232c27;
+  --nav-active-bg: #26382e;
+  --table-header-bg: #191f1b;
+  --table-row-hover: #202b24;
+  --table-row-color: #c5d1ca;
+  --table-header-color: #a0b0a8;
+  --bar-track-bg: #28312b;
+  --bar-name-color: #c5d1ca;
+  --bar-val-color: #a0b0a8;
+  --input-bg: #141a16;
+  --input-border: #435248;
+  --btn-sec-bg: #212a24;
+  --btn-sec-border: #435248;
+  --notice-info-bg: #17271e;
+  --notice-info-border: #37523f;
+  --notice-info-text: #c0d9c8;
+  background: var(--bg);
+}
+[data-theme="light"] .spatial-app:not(.on-landing) {
+  --bg: #f1f1eb;
+  --panel: #fdfdf8;
+  --panel-card: #f6f7f0;
+  --panel-card-2: #f6f7f0;
+  --panel-card-3: #eef1e8;
+  --text: #202c24;
+  --text-heading: #14241a;
+  --text-dim: #415447;
+  --text-mono: #344b3b;
+  --muted: #5b6c5e;
+  --eyebrow: #596b5e;
+  --line: #d0d7cb;
+  --line-subtle: #e0e5d9;
+  --line-card: #d3dbcd;
+  --line-focus: #306c42;
+  --cyan: #347349;
+  --amber: #8c5515;
+  --sp-accent: #347349;
+  --nav-hover-bg: #e7ecdf;
+  --nav-active-bg: #dfe9d9;
+  --table-header-bg: #f1f4e9;
+  --table-row-hover: #edf2e5;
+  --table-row-color: #344b3b;
+  --table-header-color: #596b5e;
+  --bar-track-bg: #e0e6d8;
+  --bar-name-color: #344b3b;
+  --bar-val-color: #596b5e;
+  --input-bg: #fcfdf7;
+  --input-border: #a9b7a1;
+  --btn-sec-bg: #eef2e5;
+  --btn-sec-border: #bdcbb4;
+  --notice-info-bg: #e9efdf;
+  --notice-info-border: #c7d6bc;
+  --notice-info-text: #3d5740;
+}
+.spatial-app:not(.on-landing) .sidebar { padding-inline: 24px; gap: 16px; }
+.spatial-app:not(.on-landing) .brand strong { letter-spacing: .15em; font-size: 13px; }
+.spatial-app:not(.on-landing) .sidebar .nav-item {
+  padding: 24px 9px;
+  color: var(--muted);
+  font-size: 12px;
+  transition: color 140ms ease-out, background-color 140ms ease-out;
+}
+.spatial-app:not(.on-landing) .sidebar .nav-item.active { color: var(--text-heading); }
+.spatial-app:not(.on-landing) #overview { padding-block: 38px 28px; gap: 24px; }
+.spatial-app:not(.on-landing) #overview h1 {
+  font-size: clamp(27px, 2.6vw, 39px);
+  font-weight: 600;
+  line-height: 1.14;
+  letter-spacing: -.045em;
+  text-wrap: balance;
+}
+.spatial-app:not(.on-landing) .eyebrow { font: 10px/1.5 Consolas, monospace; letter-spacing: .12em; }
+.spatial-app:not(.on-landing) .eyebrow-live { display: none; } /* No decorative "live" indicator. */
+.spatial-app:not(.on-landing) .header-subtitle { color: var(--muted); font-size: 13px; margin-top: 10px; }
+.spatial-app:not(.on-landing) .capture-state { background: transparent; box-shadow: none; border-color: var(--line); font-size: 12px; }
+.spatial-app:not(.on-landing) .button { min-height: 40px; border-radius: 6px; }
+.spatial-app:not(.on-landing) .button.rolling { background: var(--cyan); border-color: var(--cyan); color: var(--bg); }
+.spatial-app:not(.on-landing) .button.rolling.active { background: #a84d4d; border-color: #a84d4d; color: #fff; }
+.spatial-app:not(.on-landing) .button.rolling::before { display: none; }
+.spatial-app:not(.on-landing) .notice { border-radius: 6px; margin-bottom: 20px; }
+.spatial-app:not(.on-landing) .panel { border-radius: 10px; }
+.spatial-app:not(.on-landing) .metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-block: 22px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.spatial-app:not(.on-landing) .metric { padding: 23px 24px; min-height: 128px; border-radius: 0; border-bottom: 0; }
+.spatial-app:not(.on-landing) .metric:not(:last-child) { border-right: 1px solid var(--line); }
+.spatial-app:not(.on-landing) .metric > span { font-size: 12px; font-weight: 500; color: var(--muted); }
+.spatial-app:not(.on-landing) .metric strong { font-size: 32px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.spatial-app:not(.on-landing) .metric:nth-child(4) strong { font-size: 20px; letter-spacing: -.02em; }
+.spatial-app:not(.on-landing) .metric small { line-height: 1.5; }
+.spatial-app:not(.on-landing) .distribution-panel { background: var(--panel); border: 1px solid var(--line); padding: 24px; }
+.spatial-app:not(.on-landing) .panel-heading h2 { letter-spacing: -.025em; font-weight: 600; }
+.spatial-app:not(.on-landing) .empty-bars { height: 140px; min-height: 0; font-size: 13px; border: 1px dashed var(--line); border-radius: 6px; }
+.spatial-app:not(.on-landing) .distribution-panel:has(.empty-bars) { min-height: 0; }
+.spatial-app:not(.on-landing) :focus-visible { outline-color: var(--line-focus); }
+
+/* One evidence surface, not a bank of ornamental cards. */
+.spatial-app .traffic-timeline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  min-height: 0;
+  border: 1px solid var(--line);
+}
+.spatial-app .traffic-timeline[hidden] { display: none; }
+.traffic-timeline .timeline-copy {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  padding: 23px 24px 20px;
+  border-right: 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+.traffic-timeline .timeline-copy > span { grid-column: 1; font: 10px/1.4 Consolas, monospace; letter-spacing: .13em; }
+.traffic-timeline .timeline-copy h2 { grid-column: 1; font-size: 24px; letter-spacing: -.04em; font-weight: 550; margin-top: 6px; }
+.traffic-timeline .timeline-copy p { grid-column: 1; font-size: 12px; margin-top: 6px; }
+.traffic-timeline .timeline-export { grid-column: 2; grid-row: 1 / 4; align-self: center; margin: 0 0 0 16px; font-size: 12px; }
+.traffic-timeline .timeline-chart-wrap { position: relative; grid-column: 1; grid-row: 2; padding: 12px 22px 14px; background: transparent; }
+.telemetry-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.telemetry-segmented { display: flex; gap: 2px; }
+.telemetry-segmented button {
+  min-height: 40px;
+  padding: 7px 11px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  transition: background-color 140ms ease-out, color 140ms ease-out;
+}
+.telemetry-segmented button[aria-pressed="true"] { background: var(--nav-active-bg); border-color: var(--line); color: var(--text); }
+.telemetry-segmented button:hover { color: var(--text); background: var(--nav-hover-bg); }
+#traffic-timeline-chart { height: 210px; cursor: crosshair; overflow: visible; }
+.telemetry-axis { fill: var(--muted); font: 10px Consolas, monospace; font-variant-numeric: tabular-nums; }
+.traffic-timeline .timeline-grid-line { stroke: var(--line-subtle); stroke-dasharray: 3 5; }
+.traffic-timeline .timeline-area { fill: color-mix(in srgb, var(--cyan) 9%, transparent); }
+.traffic-timeline .timeline-line { stroke-width: 1.8px; }
+.telemetry-crosshair { stroke: var(--muted); stroke-width: 1px; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
+.telemetry-issue-point { fill: var(--amber); stroke: var(--panel); stroke-width: 1px; }
+.telemetry-observed-point { fill: var(--cyan); }
+.traffic-chart-empty {
+  position: absolute;
+  inset: 78px 24px 65px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  pointer-events: none;
+  text-align: center;
+  background: var(--panel);
+}
+.traffic-chart-empty[hidden] { display: none; }
+.traffic-chart-empty > span { color: var(--muted); font: 22px Consolas, monospace; letter-spacing: .15em; margin-bottom: 8px; }
+.traffic-chart-empty strong { color: var(--text); font-size: 15px; font-weight: 500; }
+.traffic-chart-empty small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.telemetry-inspector { display: grid; grid-template-columns: auto minmax(50px, 1fr); align-items: center; gap: 0 14px; padding-top: 10px; border-top: 1px solid var(--line-subtle); }
+.telemetry-inspector label { color: var(--muted); font-size: 11px; }
+.telemetry-inspector input { width: 100%; min-width: 0; height: 40px; margin: 0; accent-color: var(--cyan); cursor: ew-resize; }
+.telemetry-inspector input:disabled { cursor: default; opacity: .35; }
+.telemetry-inspector output { grid-column: 1 / -1; min-height: 28px; padding-top: 6px; color: var(--text-dim); font: 12px/1.6 Consolas, monospace; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.traffic-timeline .timeline-stats { grid-column: 2; grid-row: 2; grid-template-columns: 1fr; gap: 18px; padding: 23px 24px; background: var(--panel-card-2); border-top: 0; border-left: 1px solid var(--line); }
+.traffic-timeline .timeline-stats span { font: 9px/1.5 Consolas, monospace; letter-spacing: .08em; }
+.traffic-timeline .timeline-stats strong { font-size: 15px; font-weight: 500; margin-top: 5px; }
+.traffic-timeline .timeline-stats > div:first-child strong { font-size: 24px; color: var(--cyan); letter-spacing: -.045em; }
+.traffic-timeline .timeline-stats > div:nth-child(4) strong,
+.traffic-timeline .timeline-window-comparison strong { font-size: 12px; }
+.traffic-timeline .timeline-window-comparison { padding-top: 15px; }
+
+@media (min-width: 1281px) {
+  .spatial-app:not(.on-landing) .metric:nth-child(2) { border-right: 1px solid var(--line); }
+}
+@media (max-width: 1050px) {
+  .spatial-app:not(.on-landing) #overview { align-items: center; }
+  .spatial-app:not(.on-landing) .header-actions { justify-content: flex-end; flex-wrap: wrap; max-width: 48%; }
+  .spatial-app .traffic-timeline { grid-template-columns: minmax(0, 1fr) 180px; }
+  .traffic-timeline .timeline-stats { padding-inline: 18px; }
+}
+@media (max-width: 780px) {
+  .spatial-app:not(.on-landing) #overview { align-items: flex-start; flex-direction: column; }
+  .spatial-app:not(.on-landing) .header-actions { justify-content: flex-start; max-width: 100%; }
+}
+@media (max-width: 900px) {
+  .spatial-app:not(.on-landing) .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .spatial-app:not(.on-landing) .metric:nth-child(2) { border-right: 0; }
+  .spatial-app:not(.on-landing) .metric:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
+}
+@media (max-width: 650px) {
+  .spatial-app:not(.on-landing) .sidebar { padding-inline: 12px; }
+  .spatial-app:not(.on-landing) #overview { padding-block: 24px 20px; }
+  .spatial-app .traffic-timeline { grid-template-columns: minmax(0, 1fr); }
+  .traffic-timeline .timeline-copy { padding: 18px; }
+  .traffic-timeline .timeline-copy h2 { font-size: 22px; }
+  .traffic-timeline .timeline-chart-wrap { padding-inline: 12px; }
+  .traffic-timeline .timeline-stats { grid-column: 1; grid-row: 3; grid-template-columns: 1fr 1fr; border-left: 0; border-top: 1px solid var(--line); gap: 18px; }
+  .telemetry-axis { display: none; } /* Keep mobile values in the unscaled inspector and statistics. */
+  .telemetry-toolbar { gap: 4px; flex-wrap: wrap; }
+  .telemetry-segmented button { padding-inline: 10px; }
+  .telemetry-inspector input { height: 44px; }
+  .traffic-timeline .timeline-export { font-size: 11px; padding-inline: 9px; }
+  .spatial-app:not(.on-landing) .metric { padding: 18px 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .telemetry-segmented button,
+  .spatial-app:not(.on-landing) .sidebar .nav-item { transition: none; }
+}
+[data-motion="reduced"] .telemetry-segmented button,
+[data-motion="reduced"] .spatial-app:not(.on-landing) .sidebar .nav-item { transition: none; }
+@media print {
+  .telemetry-toolbar, .telemetry-inspector input, .timeline-export { display: none; }
+  .spatial-app .traffic-timeline { break-inside: avoid; }
+}

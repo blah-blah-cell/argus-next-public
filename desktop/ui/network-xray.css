@@ -1,0 +1,26 @@
+/* Operational X-Ray layout; the canvas and keyboard index share observed data. */
+#spatial-workspace[hidden] {display:none!important}
+.xray-load-status {margin:0;color:var(--text-dim);font-size:12px;overflow-wrap:anywhere}
+.xray-load-status[data-state="error"] {color:#fbbf24}
+[data-theme="light"] .xray-load-status[data-state="error"] {color:#92400e}
+.xray-panel>.panel-heading {align-items:flex-start;flex-wrap:wrap;gap:14px}
+.xray-panel>.panel-heading>div:first-child {flex:1;min-width:170px}
+.xray-panel .xray-actions {justify-content:flex-start;max-width:100%}
+.xray-panel .xray-filter-group {flex-wrap:wrap}
+.xray-explorer {display:grid;grid-template-columns:minmax(0,1fr) minmax(230px,290px);gap:16px;align-items:start}
+.xray-explorer .xray-canvas-container {min-width:0;box-shadow:none}
+.xray-endpoint-index {height:540px;box-sizing:border-box;display:flex;flex-direction:column;border:1px solid var(--line-card);border-radius:10px;padding:16px;background:var(--panel-card);min-width:0}
+.xray-endpoint-index h3 {margin:0;font-size:14px;text-wrap:balance}
+.xray-index-help {margin:8px 0 16px;color:var(--text-dim);font-size:12px;line-height:1.5;text-wrap:pretty}
+.xray-endpoint-index label {font-size:12px;margin-bottom:6px}
+#xray-endpoint-search {width:100%;box-sizing:border-box;background:var(--input-bg);color:var(--text);border:1px solid var(--input-border);border-radius:6px;padding:9px 10px;min-height:38px}
+#xray-index-count,#xray-index-empty {font-size:11px;color:var(--text-dim);line-height:1.5;font-variant-numeric:tabular-nums}
+#xray-endpoint-list {list-style:none;margin:0;padding:0;overflow-y:auto;min-height:0;flex:1}
+#xray-endpoint-list li+li {margin-top:4px}
+#xray-endpoint-list button {display:block;width:100%;text-align:left;padding:10px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text);cursor:pointer}
+#xray-endpoint-list strong {display:block;font-size:12px;overflow-wrap:anywhere}
+#xray-endpoint-list span {display:block;margin-top:4px;font-size:11px;color:var(--text-dim);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#xray-endpoint-list button:hover {background:rgba(148,163,184,.08)}
+#xray-endpoint-list button[aria-pressed="true"] {border-color:#62b8ab;background:rgba(98,184,171,.1)}
+#xray-endpoint-search:focus-visible,#xray-endpoint-list button:focus-visible {outline:2px solid #62b8ab;outline-offset:2px}
+@media(max-width:1000px){.xray-explorer{grid-template-columns:minmax(0,1fr)}.xray-endpoint-index{height:320px}.xray-explorer .xray-canvas-container{height:420px}}

@@ -1,0 +1,1226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Argus Next</title>
+    <script src="onboarding-boot.js?v=cinematic-1"></script>
+    <link rel="stylesheet" href="styles.css?v=brand-v3-1" />
+    <link rel="icon" type="image/svg+xml" href="branding/argus-icon.svg" />
+    <link rel="stylesheet" href="spatial/workspace.css?v=roughness-1" />
+    <link rel="stylesheet" href="network-xray.css?v=1" />
+    <link rel="stylesheet" href="simulation-lab.css?v=1" />
+    <link rel="stylesheet" href="spatial/journey.css?v=cinematic-1" />
+    <link rel="stylesheet" href="spatial/cinematic-setup.css?v=room-orbit-1" />
+    <link rel="stylesheet" href="observatory.css?v=1" />
+  </head>
+  <body class="spatial-app">
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"><img src="branding/argus-icon.svg" alt="" width="36" height="36" /></span>
+          <div><strong>ARGUS <em>NEXT</em></strong><small>Network intelligence</small></div>
+        </div>
+        <nav aria-label="Primary navigation">
+          <span class="nav-group-label">Monitor</span>
+          <button class="nav-item active" data-target="overview" title="Overview" aria-current="location">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+              </svg>
+            </span>
+            Overview
+          </button>
+          <span class="nav-group-label">Investigate</span>
+          <button class="nav-item" data-target="flows" title="Flows">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="17 1 21 5 17 9"></polyline>
+                <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                <polyline points="7 23 3 19 7 15"></polyline>
+                <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+              </svg>
+            </span>
+            Flows
+          </button>
+          <button class="nav-item" data-target="xray" title="Network X-Ray">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+            </span>
+            Network X-Ray
+          </button>
+          <button class="nav-item" data-target="evidence" title="Evidence">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <polyline points="9 12 11 14 15 10"></polyline>
+              </svg>
+            </span>
+            Evidence
+          </button>
+          <button class="nav-item" data-target="models" title="Models">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <circle cx="19" cy="5" r="2"></circle>
+                <circle cx="5" cy="5" r="2"></circle>
+                <circle cx="5" cy="19" r="2"></circle>
+                <circle cx="19" cy="19" r="2"></circle>
+                <line x1="12" y1="9" x2="12" y2="3"></line>
+                <line x1="12" y1="15" x2="12" y2="21"></line>
+                <line x1="9" y1="12" x2="3" y2="12"></line>
+                <line x1="15" y1="12" x2="21" y2="12"></line>
+              </svg>
+            </span>
+            Models
+          </button>
+          <button class="nav-item" data-target="alerts" title="Alerts">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+            </span>
+            Alerts
+            <span id="nav-alert-badge" class="nav-badge">0</span>
+          </button>
+          <span class="nav-group-label">Tools</span>
+          <button class="nav-item" data-target="simulation" title="Simulation Lab">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+            </span>
+            Simulation Lab
+          </button>
+          <button class="nav-item" data-target="active-defense" title="Attack Control">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+              </svg>
+            </span>
+            Attack Control
+            <span id="nav-blocked-badge" class="nav-badge" style="background: #f43f5e; display: none;">0</span>
+          </button>
+          <button class="nav-item" data-target="diagnostics" title="Diagnostics">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+            </span>
+            Diagnostics
+          </button>
+        </nav>
+        <div class="runtime-card">
+          <div class="runtime-title">
+            <span class="status-dot amber"></span>Model backend
+          </div>
+          <strong id="model-state">Checking…</strong>
+          <span id="moe-state">MoE status pending</span>
+          <div class="schema-chip" id="schema-state">—</div>
+        </div>
+        <button
+          class="sidebar-settings-button"
+          id="user-settings-button"
+          type="button"
+          aria-label="User settings"
+          aria-haspopup="dialog"
+          aria-controls="user-settings-panel"
+          aria-expanded="false"
+        >
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.12.38.34.72.64.98.3.26.68.4 1.08.4H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z"></path>
+            </svg>
+          </span>
+          <span><strong>User settings</strong><small>Appearance &amp; runtime</small></span>
+          <span class="settings-chevron" aria-hidden="true">›</span>
+        </button>
+        <div class="sidebar-foot">
+          Local-only processing<br /><span>No traffic leaves this device</span>
+        </div>
+      </aside>
+
+      <main>
+        <section id="spatial-workspace" class="spatial-workspace workspace-hidden" aria-labelledby="spatial-title" hidden inert>
+          <div id="intro-visual-story" class="intro-visual-story">
+          <div class="spatial-pin">
+          <div class="spatial-heading">
+              <div><span class="spatial-kicker">WELCOME</span><h2 id="spatial-title" tabindex="-1">Your network. In context.</h2></div>
+            <div class="spatial-mode"><button type="button" data-workspace-jump>Skip to setup ↗</button><span id="spatial-renderer-status" role="status">Starting view…</span><button id="spatial-mode-toggle" type="button" aria-pressed="false">Flat view</button></div>
+          </div>
+          <div class="spatial-stage" id="spatial-stage" data-renderer="loading">
+            <div class="spatial-wordmark" aria-hidden="true">ARGUS</div>
+            <div class="spatial-viewport">
+              <canvas id="spatial-canvas" aria-hidden="true"></canvas>
+              <svg id="spatial-flat" viewBox="0 0 1000 550" aria-hidden="true" hidden></svg>
+            </div>
+            <div class="spatial-caption"><span>YOUR NETWORK, IN CONTEXT</span><p id="spatial-empty">No flow data loaded. Connections appear after capture.</p></div>
+            <div class="spatial-narrative"><div class="spatial-network-copy" data-intro-copy="0"><span>01 / YOUR NETWORK</span><p>See what’s<br>connected.</p><small>Argus brings local traffic, devices and alerts<br>into one place. Your traffic stays on this device.</small></div><div class="spatial-memory-copy" data-intro-copy="1"><span>02 / MEMORY</span><p>One flow.<br>A longer memory.</p><small>Recent traffic. Observed transitions.<br>Context for the next packet.</small></div><div class="spatial-evidence-copy" data-intro-copy="2"><span>03 / EVIDENCE</span><p>Follow the flow.<br>Inspect the evidence.</p><small>Endpoints, packet history and model results.<br>Kept together, on this device.</small></div></div>
+            <aside class="spatial-inspector" aria-label="Endpoint inspection" hidden>
+              <button id="spatial-deselect" type="button" aria-label="Close endpoint inspection">×</button>
+              <span>SELECTED ENDPOINT</span><h3 id="spatial-address" tabindex="-1"></h3>
+              <dl><div><dt>Flows shown</dt><dd id="spatial-node-flows">—</dd></div><div><dt>Packets</dt><dd id="spatial-node-packets">—</dd></div><div><dt>Bytes</dt><dd id="spatial-node-bytes">—</dd></div></dl>
+              <button id="spatial-inspect" type="button">Open flow evidence ↗</button>
+            </aside>
+            <div class="spatial-tools" aria-label="Scene controls">
+              <div class="spatial-presets" role="group" aria-label="Camera view"><button type="button" data-view="home" aria-pressed="true">Perspective</button><button type="button" data-view="front" aria-pressed="false">Front</button><button type="button" data-view="top" aria-pressed="false">Top</button></div>
+              <div class="spatial-camera" role="group" aria-label="Camera adjustments"><button type="button" data-rotate="-0.24" aria-label="Rotate left">↶</button><button type="button" data-rotate="0.24" aria-label="Rotate right">↷</button><button type="button" data-zoom="-1" aria-label="Zoom in">+</button><button type="button" data-zoom="1" aria-label="Zoom out">−</button></div>
+              <label class="spatial-roughness" for="hero-roughness"><span>Roughness</span><input id="hero-roughness" type="range" min="0" max="100" step="1" value="18" disabled title="Roughness is available in 3D view" /><output id="hero-roughness-value" for="hero-roughness">18%</output></label>
+              <label class="spatial-protocol">Protocol <select id="spatial-protocol"><option value="all">All</option><option value="tcp">TCP</option><option value="udp">UDP</option></select></label>
+            </div>
+          </div>
+          <div class="spatial-foot"><span id="spatial-count">Waiting for observed flows</span><span id="spatial-instructions">Drag to orbit · use + / − to zoom</span></div>
+          <button class="spatial-enter" type="button" data-workspace-jump>Explore Argus <span aria-hidden="true">↓</span></button>
+          <span id="spatial-progress" class="spatial-progress" aria-hidden="true"></span>
+          <span class="spatial-scroll-cue" aria-hidden="true">SCROLL TO EXPLORE <span>↓</span></span>
+          </div>
+          <div class="journey-band journey-band-welcome" data-journey-band="-1" data-intro-chapter="0" aria-hidden="true"></div>
+          <div class="journey-band journey-band-memory" data-journey-band="-1" data-intro-chapter="1" aria-hidden="true"></div>
+          <div class="journey-band journey-band-evidence" data-journey-band="-1" data-intro-chapter="2" aria-hidden="true"></div>
+          <div class="journey-anchor journey-anchor-network" data-intro-anchor="0" aria-hidden="true"></div>
+          <div class="journey-anchor journey-anchor-memory" data-intro-anchor="1" aria-hidden="true"></div>
+          <div class="journey-anchor journey-anchor-evidence" data-intro-anchor="2" aria-hidden="true"></div>
+          <div class="journey-band journey-band-privacy" data-journey-band="0" aria-hidden="true"></div>
+          <div class="journey-band journey-band-checks" data-journey-band="1" aria-hidden="true"></div>
+          <div class="journey-band journey-band-start" data-journey-band="2" aria-hidden="true"></div>
+          <div class="journey-anchor journey-anchor-privacy" data-journey-anchor="0" aria-hidden="true"></div>
+          <div class="journey-anchor journey-anchor-checks" data-journey-anchor="1" aria-hidden="true"></div>
+          <div class="journey-anchor journey-anchor-start" data-journey-anchor="2" aria-hidden="true"></div>
+          </div>
+          <div class="journey-fallback-copy"><h3>See your network.</h3><p>Argus brings local traffic, devices and alerts into one place. Your traffic stays on this device.</p><h3>Keep the context.</h3><p>Earlier packets from the same flow help the memory model forecast what comes next.</p><h3>Follow the evidence.</h3><p>Inspect observed endpoints, flow history, model results and deterministic rule matches together. Forecasts are not attack verdicts.</p></div>
+        </section>
+
+        <header id="overview">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-live"></span> WINDOWS SENSOR · LOCAL RUNTIME</p>
+            <h1 tabindex="-1">Network overview</h1>
+            <p class="header-subtitle">Private, real-time traffic intelligence on this device</p>
+          </div>
+          <div class="header-actions">
+            <div class="capture-state">
+              <span class="status-dot" id="capture-dot"></span
+              ><span id="capture-state">Sensor checking…</span>
+            </div>
+            <button
+              class="theme-toggle"
+              id="theme-toggle"
+              type="button"
+              role="switch"
+              aria-checked="true"
+              aria-label="Toggle light and dark mode"
+              title="Toggle theme (Light / Dark)"
+            >
+              <span class="theme-toggle-track">
+                <span class="theme-icon sun-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="4"></circle>
+                    <path d="M12 2v2"></path>
+                    <path d="M12 20v2"></path>
+                    <path d="m4.93 4.93 1.41 1.41"></path>
+                    <path d="m17.66 17.66 1.41 1.41"></path>
+                    <path d="M2 12h2"></path>
+                    <path d="M20 12h2"></path>
+                    <path d="m6.34 17.66-1.41 1.41"></path>
+                    <path d="m19.07 4.93-1.41 1.41"></path>
+                  </svg>
+                </span>
+                <span class="theme-icon moon-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+                  </svg>
+                </span>
+                <span class="theme-toggle-thumb">
+                  <svg class="thumb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                    <mask id="moon-mask">
+                      <rect x="0" y="0" width="24" height="24" fill="white" />
+                      <circle class="moon-cutout" cx="19" cy="6" r="8" fill="black" />
+                    </mask>
+                    <circle class="sun-moon-core" cx="12" cy="12" r="5" fill="currentColor" mask="url(#moon-mask)" />
+                    <g class="sun-rays" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="1" x2="12" y2="3" />
+                      <line x1="12" y1="21" x2="12" y2="23" />
+                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                      <line x1="1" y1="12" x2="3" y2="12" />
+                      <line x1="21" y1="12" x2="23" y2="12" />
+                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                    </g>
+                  </svg>
+                </span>
+              </span>
+            </button>
+            <button class="button rolling" id="rolling-button">
+              Start monitoring
+            </button>
+          </div>
+        </header>
+
+        <div class="notice" id="notice" role="status" aria-live="polite" aria-atomic="true">
+          <span class="notice-icon">i</span
+          ><span id="notice-text"
+            >Monitoring starts automatically. Capture analysis, temporal models,
+            and bounded cleanup run without manual steps.</span
+          >
+        </div>
+
+        <section id="spatial-endpoint-workspace" aria-label="Endpoint index">
+          <details class="spatial-endpoint-list"><summary>Browse observed endpoints <span id="spatial-list-count">(0)</span></summary><div id="spatial-endpoints"><p>No endpoints available.</p></div></details>
+        </section>
+
+        <section class="rolling-summary panel" id="rolling-summary" hidden>
+          <div>
+            <span>ROLLING SEGMENTS</span
+            ><strong id="rolling-segments">0</strong>
+          </div>
+          <div>
+            <span>CUMULATIVE PACKETS</span
+            ><strong id="rolling-packets">0</strong>
+          </div>
+          <div>
+            <span>FLOW OBSERVATIONS</span><strong id="rolling-flows">0</strong>
+          </div>
+          <div>
+            <span>WIRE BYTES</span><strong id="rolling-bytes">0 B</strong>
+          </div>
+          <small id="rolling-retention"
+            >Bounded flow history is stored locally without retaining live packet captures.</small
+          >
+        </section>
+
+        <section class="traffic-timeline panel" id="traffic-timeline" aria-labelledby="traffic-timeline-title">
+          <div class="timeline-copy">
+            <span>OBSERVED TRAFFIC</span>
+            <h2 id="traffic-timeline-title">The network’s pulse.</h2>
+            <p id="traffic-timeline-range">Waiting for completed capture segments.</p>
+            <button class="button secondary timeline-export" id="export-session-button" type="button">Export session</button>
+          </div>
+          <div class="timeline-chart-wrap">
+            <div class="telemetry-toolbar">
+              <div class="telemetry-segmented" role="group" aria-label="Traffic measurement">
+                <button type="button" data-traffic-metric="packets" aria-pressed="true">Packets</button>
+                <button type="button" data-traffic-metric="bytes" aria-pressed="false">Bytes</button>
+              </div>
+              <div class="telemetry-segmented" role="group" aria-label="Traffic time window">
+                <button type="button" data-traffic-window="60" aria-pressed="true">1 min</button>
+                <button type="button" data-traffic-window="300" aria-pressed="false">5 min</button>
+                <button type="button" data-traffic-window="0" aria-pressed="false">All</button>
+              </div>
+            </div>
+            <svg
+              id="traffic-timeline-chart"
+              viewBox="0 0 760 170"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label="No live traffic samples available"
+            ></svg>
+            <div id="traffic-chart-empty" class="traffic-chart-empty"><span aria-hidden="true">— / —</span><strong>Nothing captured yet.</strong><small>Completed segments appear here. No estimated activity.</small></div>
+            <div class="telemetry-inspector">
+              <label for="traffic-segment-cursor">Inspect segment</label>
+              <input id="traffic-segment-cursor" type="range" min="0" max="0" value="0" step="1" disabled aria-describedby="traffic-segment-detail" />
+              <output id="traffic-segment-detail" for="traffic-segment-cursor" aria-live="off">Awaiting capture</output>
+            </div>
+          </div>
+          <div class="timeline-stats">
+            <div><span>LATEST RATE</span><strong id="timeline-latest-rate">—</strong></div>
+            <div><span>AVERAGE RATE</span><strong id="timeline-average-rate">—</strong></div>
+            <div><span>PEAK RATE</span><strong id="timeline-peak-rate">—</strong></div>
+            <div><span>QUALITY</span><strong id="timeline-quality">—</strong></div>
+            <div class="timeline-window-comparison"><span>LAST COMPLETED SEGMENT</span><strong id="timeline-comparison">Awaiting history</strong></div>
+          </div>
+        </section>
+
+        <section class="metrics">
+          <article class="metric panel">
+            <span>Packets observed</span><strong id="metric-packets">—</strong
+            ><small id="metric-records">No run loaded</small>
+          </article>
+          <article class="metric panel">
+            <span>Flow instances</span><strong id="metric-flows">—</strong
+            ><small>Flow instances in the latest analysis</small>
+          </article>
+          <article class="metric panel">
+            <span>Capture integrity</span><strong id="metric-quality">—</strong>
+            <small id="metric-quality-detail"
+              >Loss · truncation · reorder</small
+            >
+          </article>
+          <article class="metric panel">
+            <span>Rule matches &amp; diagnostics</span><strong id="metric-detector">AWAITING DATA</strong>
+            <small id="metric-detector-detail"
+              >Waiting for traffic analysis</small
+            >
+          </article>
+        </section>
+
+        <section class="visual-grid" aria-label="Observed network activity">
+          <article class="panel topology-panel">
+            <div class="panel-heading">
+              <div>
+                <span>FLOW TOPOLOGY</span>
+                <h2>Observed endpoint relationships</h2>
+              </div>
+              <span class="legend"><i></i> Packet volume</span>
+            </div>
+            <div class="empty-state" id="topology-empty">
+              Endpoint relationships appear after a completed capture segment.
+            </div>
+            <svg
+              id="topology"
+              viewBox="0 0 820 280"
+              role="img"
+              aria-label="Network flow topology"
+            ></svg>
+          </article>
+          <article class="panel distribution-panel">
+            <div class="panel-heading">
+              <div>
+                <span>TRAFFIC DISTRIBUTION</span>
+                <h2>Largest flows</h2>
+              </div>
+            </div>
+            <div class="bar-chart" id="bar-chart">
+              <div class="empty-bars">Largest flows appear after capture.</div>
+            </div>
+          </article>
+        </section>
+
+        <section class="model-lab panel" id="models">
+          <div class="panel-heading">
+            <div>
+              <span>LOCAL MODEL BACKEND</span>
+              <h2>Model workspace</h2>
+            </div>
+            <span class="model-warning"
+              >Live execution · local processing</span
+            >
+          </div>
+          <details class="research-proof" id="research-proof">
+            <summary>Research results &amp; model provenance</summary>
+            <div class="research-proof-head">
+              <div>
+                <span>FROZEN RESEARCH EVIDENCE</span>
+                <strong id="research-model-id">AHEM v6.1</strong>
+              </div>
+              <span class="research-proof-badge" id="research-evidence-state">CHECKING</span>
+            </div>
+            <div class="research-proof-metrics">
+              <div><span>VS MATCHED LSTM</span><strong id="research-effect">—</strong></div>
+              <div><span>95% FROZEN INTERVAL</span><strong id="research-interval">—</strong></div>
+              <div><span>TEST DESIGN</span><strong id="research-design">—</strong></div>
+              <div><span>RUNTIME ARTIFACT</span><strong id="research-runtime-state">—</strong></div>
+            </div>
+            <p id="research-proof-detail">Loading the frozen evidence contract…</p>
+            <code id="research-artifact-hash">No admitted research artifact hash</code>
+          </details>
+          <section class="model-activity is-idle" id="model-activity-section" aria-labelledby="model-activity-title">
+            <div class="model-activity-head">
+              <div>
+                <span>MODEL EXECUTION</span>
+                <strong id="model-activity-title">Live inference path</strong>
+              </div>
+              <span class="model-activity-stats" id="model-activity-stats">Awaiting analysis</span>
+            </div>
+            <div class="execution-map" role="img" aria-label="Live packet, feature, memory, router, model, and forecast execution path">
+              <svg id="model-activity-graph" viewBox="0 0 1120 440" preserveAspectRatio="xMidYMid meet"></svg>
+            </div>
+            <p class="model-activity-detail" id="model-activity-detail">
+              Model activity updates after each completed analysis.
+            </p>
+          </section>
+          <details class="model-inventory">
+            <summary>Installed models &amp; availability</summary>
+          <div class="model-grid" id="model-grid">
+            <div class="empty-bars">Checking local artifacts...</div>
+          </div>
+          </details>
+          <p class="model-scope-note">Models forecast packet size and timing. Security detection is not enabled for these forecasts.</p>
+          <div class="learning-status" id="learning-status">
+            <div>
+              <span>DAILY SHADOW LEARNING</span>
+              <strong id="learning-state">CHECKING</strong>
+            </div>
+            <div>
+              <span>BOUNDED REAL FEATURES</span>
+              <strong id="learning-packets">0 packets</strong>
+            </div>
+            <p id="learning-detail">
+              Self-supervised forecast learning only; security labels and automatic promotion are disabled.
+            </p>
+          </div>
+          <div class="cnn-result" id="cnn-result" hidden>
+            <div><span>MODE</span><strong id="cnn-mode">-</strong></div>
+            <div>
+              <span>ACTIVE MODELS</span><strong id="cnn-predictions">-</strong>
+            </div>
+            <div>
+              <span>LOSS CONTRACTS</span><strong id="cnn-mean">-</strong>
+            </div>
+            <div>
+              <span>RETAINED PACKETS</span><strong id="cnn-p95">-</strong>
+            </div>
+            <div>
+              <span>ACCELERATOR</span><strong id="cnn-device">-</strong>
+            </div>
+            <div>
+              <span>VRAM / LATENCY</span><strong id="cnn-vram-latency">-</strong>
+            </div>
+            <p id="cnn-contract">No temporal model run.</p>
+            <div class="forecast-facts" id="forecast-facts"></div>
+            <div class="forecast-errors" id="forecast-errors"></div>
+          </div>
+          <details class="model-latency-panel" id="model-latency-panel">
+            <summary>Observed model latency history <span id="model-latency-summary">No completed model runs</span></summary>
+            <div class="model-latency-list" id="model-latency-list">
+              <div class="empty-bars">Latency samples appear after real model execution.</div>
+            </div>
+          </details>
+        </section>
+
+        <section class="evidence-panel panel" id="evidence">
+          <div class="panel-heading">
+            <div>
+              <span>OBSERVABILITY</span>
+              <h2>Capture evidence and provenance</h2>
+            </div>
+            <span class="evidence-truth">Observed counters only</span>
+          </div>
+          <div class="evidence-grid" id="evidence-grid">
+            <div class="empty-bars">
+              Evidence appears after the first completed analysis.
+            </div>
+          </div>
+        </section>
+
+        <section class="diagnostics-panel panel" id="diagnostics">
+          <div class="panel-heading">
+            <div>
+              <span>RUNTIME HEALTH</span>
+              <h2>Installation and sensor diagnostics</h2>
+            </div>
+            <button class="button secondary" id="diagnostics-button">
+              Run diagnostics
+            </button>
+          </div>
+          <div class="diagnostics-summary">
+            <div>
+              <span>OVERALL</span><strong id="diagnostics-state">CHECKING</strong>
+            </div>
+            <div>
+              <span>LOCAL DATA ROOT</span><code id="diagnostics-root">—</code>
+            </div>
+            <div>
+              <span>CAPTURE STORAGE</span><strong id="diagnostics-storage">—</strong>
+            </div>
+          </div>
+          <div class="diagnostics-grid" id="diagnostics-grid">
+            <div class="empty-bars">Running local checks...</div>
+          </div>
+        </section>
+
+        <section class="panel alerts-panel" id="alerts" style="display: none;">
+          <div class="panel-heading">
+            <div>
+              <span>ATTACK EVIDENCE & DIAGNOSTICS</span>
+              <h2>Rule matches &amp; forecast diagnostics</h2>
+            </div>
+            <div class="alert-controls">
+              <div class="filter-pills">
+                <button class="filter-pill active" data-alert-filter="all">All</button>
+                <button class="filter-pill critical" data-alert-filter="critical">Critical</button>
+                <button class="filter-pill suspicious" data-alert-filter="suspicious">Review</button>
+              </div>
+              <button id="export-report-btn" class="button" style="padding: 6px 12px; font-size: 11px;">
+                Export Report
+              </button>
+              <button id="clear-alerts-btn" class="button secondary" style="padding: 6px 12px; font-size: 11px;">
+                Clear Alerts
+              </button>
+            </div>
+          </div>
+          <div id="alerts-container" class="alerts-list">
+            <div class="empty-state" style="height: 160px;">No attack signatures or diagnostic events have been recorded.</div>
+          </div>
+        </section>
+
+        <section class="panel simulation-panel" id="simulation" style="display: none;">
+          <div class="panel-heading">
+            <div>
+              <span>LOCAL REPLAY WORKBENCH</span>
+              <h2>Simulation Lab</h2>
+            </div>
+            <div class="simulation-controls">
+              <button id="sim-reload-btn" type="button" class="button secondary">Reload scenarios</button>
+              <button id="sim-run-all-btn" type="button" class="button" disabled>Run full suite</button>
+              <button id="sim-stop-btn" type="button" class="button secondary" disabled>Stop after current</button>
+            </div>
+          </div>
+          <p class="simulation-intro">
+            Replay deterministic synthetic packet fixtures through the real parser, rules and isolated model worker. No packets are sent onto your network. Results stay here, separate from live monitoring. Rule matches and forecast outputs are shown separately; this is not a detection-accuracy benchmark.
+          </p>
+          <div class="sim-workbench-controls">
+            <label for="sim-packet-count">Packets per scenario <input id="sim-packet-count" type="number" min="10" max="500" step="1" value="160" aria-describedby="sim-count-help" /></label>
+            <span id="sim-count-help">10–500 packets. One scenario at a time.</span>
+          </div>
+          <p id="sim-lab-status" role="status">Loading local scenarios…</p>
+          <ol id="sim-run-queue" aria-label="Scenario queue"></ol>
+          <div class="simulation-grid" id="simulation-cards-container">
+            <div class="empty-bars">Loading local packet scenarios…</div>
+          </div>
+          <div class="simulation-status-card" id="simulation-status-card" style="display: none;">
+            <div class="sim-status-header">
+              <span class="sim-status-title">SELECTED LOCAL REPLAY</span>
+              <strong id="sim-status-name">—</strong>
+            </div>
+            <div class="sim-stats-row" id="sim-stats-row"></div>
+            <div class="sim-model-results" id="sim-model-results" aria-live="polite"></div>
+            <h3>Observed flow evidence</h3>
+            <p id="sim-evidence-summary"></p>
+            <div class="sim-evidence-scroll"><table class="sim-evidence-table"><caption>Flows from this synthetic replay only</caption><thead><tr><th scope="col">Endpoints</th><th scope="col">Protocol</th><th scope="col">Packets</th><th scope="col">Rule evidence</th></tr></thead><tbody id="sim-flow-evidence"></tbody></table></div>
+          </div>
+          <section class="sim-history" aria-labelledby="sim-history-title"><h3 id="sim-history-title">Session runs</h3><p>Last 10 runs in this session. Select one to inspect; failures remain visible.</p><ul id="sim-run-history"></ul></section>
+        </section>
+
+        <section class="panel active-defense-panel" id="active-defense" style="display: none;">
+          <div class="panel-heading">
+            <div>
+              <span>DETERMINISTIC ATTACK DETECTION & POLICY</span>
+              <h2>Attack Evidence, Allowlists, and Blocklists</h2>
+            </div>
+            <div class="active-defense-header-actions">
+              <button id="clear-all-blacklist-btn" class="button secondary" style="padding: 5px 12px; font-size: 11px;">Clear All Rules</button>
+            </div>
+          </div>
+          <p class="active-defense-intro">
+            Argus detects auditable TCP-evasion, scan, and volumetric signatures separately from AHEM forecasting. Allowlists suppress automatic attack verdicts; blocklists create explicit matches and only drop packets when Windows Defender Firewall enforcement is confirmed.
+          </p>
+
+          <div class="defense-stats-grid">
+            <div class="defense-stat-card">
+              <span>ACTIVE POLICY RULES</span>
+              <strong id="stat-active-rules">0</strong>
+            </div>
+            <div class="defense-stat-card">
+              <span>ALLOW / BLOCK</span>
+              <strong id="stat-rule-split">0 / 0</strong>
+            </div>
+            <div class="defense-stat-card">
+              <span>OS FIREWALL SYNC</span>
+              <strong id="stat-os-rules">0 Rules</strong>
+            </div>
+          </div>
+
+          <div class="defense-policy-box">
+            <div class="policy-box-head">
+              <h3>Rule Evaluation</h3>
+              <label class="simulation-toggle-label" title="Enable or disable local rule matching">
+                <input type="checkbox" id="defense-master-toggle" checked />
+                <span class="toggle-switch-track"></span>
+                <span>Rule Matching Enabled</span>
+              </label>
+            </div>
+            <div class="policy-options-grid">
+              <label class="policy-checkbox-label">
+                <input type="checkbox" id="policy-apply-os-firewall" />
+                <span>Require confirmed Windows Defender Firewall enforcement for new rules (Administrator required)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="manual-block-box">
+            <h3>Add Endpoint Policy</h3>
+            <form id="manual-block-form" class="manual-block-form">
+              <input type="text" id="manual-block-ip" placeholder="IPv4, IPv6, or CIDR network" required />
+              <input type="text" id="manual-block-reason" placeholder="Reason (e.g. trusted DNS / confirmed C2)" required />
+              <select id="manual-rule-action">
+                <option value="block" selected>Blocklist</option>
+                <option value="allow">Allowlist</option>
+                <option value="watch">Watch only</option>
+              </select>
+              <select id="manual-block-severity">
+                <option value="Critical">Critical</option>
+                <option value="Suspicious">Suspicious</option>
+                <option value="Manual" selected>Manual</option>
+              </select>
+              <button type="submit" class="button" style="white-space: nowrap;">Save Rule</button>
+            </form>
+          </div>
+
+          <div class="blacklist-table-wrap">
+            <div class="table-heading-sub">
+              <h3>Allow, watch, and block rules</h3>
+              <span id="blacklist-rule-count">0 active rules</span>
+            </div>
+            <table class="blacklist-table">
+              <thead>
+                <tr>
+                  <th>Target IP / Subnet</th>
+                  <th>Action</th>
+                  <th>Reason</th>
+                  <th>Severity</th>
+                  <th>Added At</th>
+                  <th>Enforcement</th>
+                  <th>OS Firewall</th>
+                  <th>Manage</th>
+                </tr>
+              </thead>
+              <tbody id="blacklist-table-body">
+                <tr>
+                  <td colspan="8" class="empty-row">No active endpoint rules.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel xray-panel" id="xray" style="display: none;">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow-accent">TOPOLOGY & ASSET PROFILER</span>
+              <h2>Network X-Ray</h2>
+            </div>
+            <div class="xray-actions">
+              <div class="xray-filter-group" role="group" aria-label="Topology Filter">
+                <button class="button secondary small active" data-xray-filter="all">All</button>
+                <button class="button secondary small" data-xray-filter="tor">Tor-Port Matches</button>
+                <button class="button secondary small" data-xray-filter="threats">Rule / Policy Flags</button>
+                <button class="button secondary small" data-xray-filter="lan">LAN Only</button>
+                <button class="button secondary small" data-xray-filter="web">HTTP/S</button>
+                <button class="button secondary small" data-xray-filter="dns">DNS</button>
+              </div>
+              <button class="button secondary small" id="xray-refresh" type="button">Refresh</button>
+              <button class="button secondary small" id="xray-physics-toggle" title="Toggle force simulation physics">Freeze Physics</button>
+              <button class="button secondary small" id="xray-reset-view" title="Reset zoom and center view">Reset View</button>
+              <button class="button small" id="xray-export-dossier" style="background: #238636; border-color: #2ea043;">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: text-bottom; margin-right: 4px;">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export Dossier
+              </button>
+            </div>
+          </div>
+
+          <div class="xray-stats-bar" id="xray-stats-bar">
+            <div class="xray-stat-item"><span class="xray-stat-label">Nodes:</span> <strong id="xray-stat-nodes">0</strong></div>
+            <div class="xray-stat-item"><span class="xray-stat-label">Edges:</span> <strong id="xray-stat-edges">0</strong></div>
+            <div class="xray-stat-item"><span class="xray-stat-label">LAN Devices:</span> <strong id="xray-stat-lan">0</strong></div>
+            <div class="xray-stat-item"><span class="xray-stat-label">External:</span> <strong id="xray-stat-ext">0</strong></div>
+            <div class="xray-stat-item warning" id="xray-stat-tor-box"><span class="xray-stat-label">Tor-port endpoints:</span> <strong id="xray-stat-tor">0</strong></div>
+            <div class="xray-stat-item alert" id="xray-stat-threats-box"><span class="xray-stat-label">Flagged endpoints:</span> <strong id="xray-stat-threats">0</strong></div>
+            <div class="xray-stat-item"><span class="xray-stat-label">Volume:</span> <strong id="xray-stat-bytes">0 B</strong></div>
+          </div>
+
+          <p id="xray-load-status" class="xray-load-status" role="status">Open this view to load observed connections.</p>
+          <div class="xray-explorer">
+          <div class="xray-canvas-container" id="xray-canvas-container">
+            <canvas id="xray-canvas" width="1100" height="540" role="img" aria-label="Observed network connections. Use the endpoint list to inspect a device without dragging the graph."></canvas>
+            <div class="xray-canvas-overlay" id="xray-canvas-overlay">
+              <span class="overlay-badge"><span class="legend-dot dot-gateway"></span>Gateway</span>
+              <span class="overlay-badge"><span class="legend-dot dot-lan"></span>LAN Host</span>
+              <span class="overlay-badge"><span class="legend-dot dot-ext"></span>External WAN</span>
+              <span class="overlay-badge"><span class="legend-dot dot-tor"></span>Tor-port heuristic</span>
+              <span class="overlay-badge"><span class="legend-dot dot-threat"></span>Rule / policy flag</span>
+            </div>
+            <div class="xray-canvas-hud-controls">
+              <button class="xray-hud-btn" id="xray-zoom-in" title="Zoom In" aria-label="Zoom in on network">+</button>
+              <button class="xray-hud-btn" id="xray-zoom-out" title="Zoom Out" aria-label="Zoom out of network">−</button>
+              <button class="xray-hud-btn" id="xray-center-view" title="Center Topology" aria-label="Center network">⊙</button>
+            </div>
+            <div class="xray-empty-hint" id="xray-empty-hint">Waiting for traffic data or live capture replay…</div>
+          </div>
+          <aside class="xray-endpoint-index" aria-labelledby="xray-index-title">
+            <h3 id="xray-index-title">Endpoints</h3>
+            <p class="xray-index-help">Select a device to inspect its connections and evidence.</p>
+            <label for="xray-endpoint-search">Find an endpoint</label>
+            <input id="xray-endpoint-search" type="search" placeholder="Address, name or role" autocomplete="off" />
+            <p id="xray-index-count" role="status">No topology loaded.</p>
+            <ul id="xray-endpoint-list"></ul>
+            <p id="xray-index-empty">Refresh to load observed endpoints. Capture traffic first if none are available.</p>
+          </aside>
+          </div>
+
+          <div class="xray-node-drawer" id="xray-node-drawer" hidden>
+            <div class="xray-node-drawer-head">
+              <div class="xray-drawer-identity">
+                <div class="xray-drawer-title-row">
+                  <span class="xray-drawer-role-badge" id="xray-drawer-badge">ENDPOINT</span>
+                  <h3 id="xray-drawer-ip">—</h3>
+                  <span class="xray-drawer-vendor-chip" id="xray-drawer-vendor-chip">—</span>
+                </div>
+                <div class="xray-drawer-meta-line" id="xray-drawer-meta">—</div>
+              </div>
+              <div class="xray-drawer-head-actions">
+                <button class="button secondary small xray-action-btn" id="xray-drawer-flows-btn" title="View all observed flows for this endpoint">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px; vertical-align: text-bottom;">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  Filter Flows
+                </button>
+                <button class="button small xray-action-btn xray-block-action" id="xray-drawer-block-btn" title="Add this endpoint to Active Defense firewall blacklist">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px; vertical-align: text-bottom;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                  </svg>
+                  Block IP
+                </button>
+                <button class="xray-drawer-close" id="xray-drawer-close" aria-label="Close dossier">×</button>
+              </div>
+            </div>
+
+            <div class="xray-drawer-grid">
+              <div class="xray-drawer-card xray-intelligence-card" style="grid-column: 1 / -1;">
+                <div class="xray-intel-header">
+                  <div class="xray-intel-eyebrow-group">
+                    <span class="xray-intel-dot"></span>
+                    <span class="drawer-card-label">ASSET INTELLIGENCE &amp; ATTRIBUTION DATABASE</span>
+                  </div>
+                  <span class="xray-intel-confidence" id="xray-drawer-intel-confidence">Authoritative</span>
+                </div>
+                <div class="xray-intel-main">
+                  <div class="xray-intel-identity">
+                    <span class="xray-intel-name" id="xray-drawer-intel-name">—</span>
+                    <span class="xray-intel-category" id="xray-drawer-intel-category">—</span>
+                  </div>
+                  <div class="xray-intel-org-row">
+                    <div class="xray-intel-field">
+                      <span class="xray-field-key">Operator &amp; ASN</span>
+                      <span class="xray-intel-org" id="xray-drawer-intel-org">—</span>
+                    </div>
+                    <div class="xray-intel-field">
+                      <span class="xray-field-key">Device Classification</span>
+                      <span class="xray-intel-device" id="xray-drawer-intel-device">—</span>
+                    </div>
+                  </div>
+                  <p class="xray-intel-description" id="xray-drawer-intel-desc">—</p>
+                </div>
+              </div>
+              <div class="xray-drawer-card">
+                <span class="drawer-card-label">Hardware Vendor (OUI)</span>
+                <strong id="xray-drawer-vendor">—</strong>
+                <small id="xray-drawer-mac" class="drawer-card-sub">—</small>
+              </div>
+              <div class="xray-drawer-card">
+                <span class="drawer-card-label">Inferred Role</span>
+                <strong id="xray-drawer-role">—</strong>
+                <small id="xray-drawer-net-type" class="drawer-card-sub">—</small>
+              </div>
+              <div class="xray-drawer-card">
+                <span class="drawer-card-label">Observed Rule / Policy Indicator</span>
+                <strong id="xray-drawer-threat">—</strong>
+                <div class="xray-threat-bar-wrap">
+                  <div class="xray-threat-bar-fill" id="xray-drawer-threat-bar" style="width: 0%;"></div>
+                </div>
+              </div>
+              <div class="xray-drawer-card">
+                <span class="drawer-card-label">Traffic Volume & Balance</span>
+                <strong id="xray-drawer-volume">—</strong>
+                <div class="xray-ratio-bar-wrap">
+                  <div class="xray-ratio-in" id="xray-drawer-ratio-in" style="width: 50%;" title="Ingress"></div>
+                  <div class="xray-ratio-out" id="xray-drawer-ratio-out" style="width: 50%;" title="Egress"></div>
+                </div>
+                <div class="xray-ratio-labels">
+                  <span id="xray-drawer-ratio-in-lbl">0% In</span>
+                  <span id="xray-drawer-ratio-out-lbl">0% Out</span>
+                </div>
+              </div>
+              <div class="xray-drawer-card" style="grid-column: 1 / -1;">
+                <span class="drawer-card-label">Discovered Active Ports & Services</span>
+                <div id="xray-drawer-ports" class="xray-drawer-ports">—</div>
+              </div>
+            </div>
+
+            <div class="xray-drawer-peers-section">
+              <div class="xray-section-head">
+                <span class="drawer-pretitle">COMMUNICATION TOPOLOGY</span>
+                <h4>Connected Peers (<span id="xray-drawer-peers-count">0</span>)</h4>
+              </div>
+              <div class="xray-drawer-peers-table-wrap">
+                <table class="xray-peers-table">
+                  <thead>
+                    <tr>
+                      <th>Peer IP</th>
+                      <th>Role / Vendor</th>
+                      <th>Protocols</th>
+                      <th>Volume</th>
+                      <th>Packets</th>
+                      <th>Direction</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="xray-drawer-peers-list">
+                    <tr><td colspan="7" class="empty-row">No peer communications recorded for this endpoint.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="xray-drawer-flows-section">
+              <div class="xray-section-head">
+                <span class="drawer-pretitle">RECENT FLOW OBSERVATIONS</span>
+                <h4>Recent Sessions Involving This Host (<span id="xray-drawer-flows-count">0</span>)</h4>
+              </div>
+              <div class="xray-drawer-flows-table-wrap">
+                <table class="xray-peers-table">
+                  <thead>
+                    <tr>
+                      <th>Direction</th>
+                      <th>Remote Endpoint</th>
+                      <th>Protocol</th>
+                      <th>Port / Service</th>
+                      <th>Packets</th>
+                      <th>Bytes</th>
+                      <th>Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody id="xray-drawer-flows-list">
+                    <tr><td colspan="7" class="empty-row">No recent flow sessions found.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel table-panel" id="flows">
+          <div class="panel-heading table-heading">
+            <div>
+              <span>FLOW INVENTORY</span>
+              <h2>Session details</h2>
+            </div>
+            <div class="table-tools">
+              <input
+                id="flow-filter"
+                type="search"
+                placeholder="Filter IP, port, protocol… (Ctrl+K)"
+              /><span id="flow-count">0 flows</span>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th><button class="table-sort active" data-flow-sort="latest" aria-label="Sort by most recently observed flow">Flow <span aria-hidden="true">↓</span></button></th>
+                  <th><button class="table-sort" data-flow-sort="protocol" aria-label="Sort by protocol">Protocol <span aria-hidden="true">↕</span></button></th>
+                  <th><button class="table-sort" data-flow-sort="initiator" aria-label="Sort by initiator">Initiator <span aria-hidden="true">↕</span></button></th>
+                  <th><button class="table-sort" data-flow-sort="responder" aria-label="Sort by responder">Responder <span aria-hidden="true">↕</span></button></th>
+                  <th><button class="table-sort" data-flow-sort="packets" aria-label="Sort by packet count">Packets <span aria-hidden="true">↕</span></button></th>
+                  <th><button class="table-sort" data-flow-sort="bytes" aria-label="Sort by byte count">Bytes <span aria-hidden="true">↕</span></button></th>
+                  <th><button class="table-sort" data-flow-sort="duration" aria-label="Sort by duration">Duration <span aria-hidden="true">↕</span></button></th>
+                  <th><button class="table-sort" data-flow-sort="quality" aria-label="Sort by quality and rule status">Quality / Rule Status <span aria-hidden="true">↕</span></button></th>
+                </tr>
+              </thead>
+              <tbody id="flow-rows">
+                <tr>
+                  <td colspan="8" class="empty-row">No capture analyzed.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-pagination" id="flow-pagination">
+            <div class="pagination-info">
+              <span id="flow-page-info">Page 1 of 1 (0 flows)</span>
+            </div>
+            <div class="pagination-controls">
+              <div class="pagination-size">
+                <label for="flow-page-size">Per page:</label>
+                <select id="flow-page-size" aria-label="Flows per page">
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="250">250</option>
+                </select>
+              </div>
+              <button id="flow-page-prev" class="btn btn-sm btn-ghost" aria-label="Previous page" disabled>
+                Previous
+              </button>
+              <div class="pagination-jump">
+                <label for="flow-page-jump">Page</label>
+                <input id="flow-page-jump" type="number" min="1" max="1" value="1" aria-label="Jump to page" />
+              </div>
+              <button id="flow-page-next" class="btn btn-sm btn-ghost" aria-label="Next page" disabled>
+                Next
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="settings-scrim" id="settings-scrim" hidden></div>
+    <dialog
+      class="settings-panel"
+      id="user-settings-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+      aria-hidden="true"
+      hidden
+    >
+      <div class="settings-head">
+        <div>
+          <span>LOCAL PREFERENCES</span>
+          <h2 id="settings-title">User settings</h2>
+        </div>
+        <button class="settings-close" id="settings-close" type="button" aria-label="Close settings" autofocus>×</button>
+      </div>
+
+      <div class="settings-user-card">
+        <span class="settings-avatar" aria-hidden="true">A</span>
+        <span><strong>Local operator</strong><small>Device-only profile · no cloud account</small></span>
+        <span class="settings-local-badge">LOCAL</span>
+      </div>
+
+      <div class="settings-group">
+        <span class="settings-label">APPEARANCE</span>
+        <span class="settings-control-label">Color theme</span>
+        <div class="setting-choice" role="group" aria-label="Color theme">
+          <button type="button" data-theme-choice="dark">Dark</button>
+          <button type="button" data-theme-choice="light">Light</button>
+        </div>
+        <span class="settings-control-label">Information density</span>
+        <div class="setting-choice" role="group" aria-label="Information density">
+          <button type="button" data-density-choice="comfortable">Comfortable</button>
+          <button type="button" data-density-choice="compact">Compact</button>
+        </div>
+        <label class="shutdown-preference" for="reduce-ui-motion">
+          <input id="reduce-ui-motion" type="checkbox" />
+          <span>
+            <strong>Reduce interface motion</strong>
+            <small>Disables decorative transitions and pulsing effects.</small>
+          </span>
+        </label>
+      </div>
+
+      <div class="settings-group">
+        <span class="settings-label">PERFORMANCE</span>
+        <div class="settings-select-row">
+          <label for="live-refresh-rate"><strong>Live refresh</strong><small>How often the UI checks for a completed segment.</small></label>
+          <select id="live-refresh-rate">
+            <option value="2000">Fast · 2s</option>
+            <option value="5000">Balanced · 5s</option>
+            <option value="10000">Efficient · 10s</option>
+          </select>
+        </div>
+        <div class="settings-select-row">
+          <label for="flow-row-limit"><strong>Flow table limit</strong><small>Caps DOM rows; capture history remains bounded separately.</small></label>
+          <select id="flow-row-limit">
+            <option value="25">25 rows</option>
+            <option value="50">50 rows</option>
+            <option value="100">100 rows</option>
+            <option value="250">250 rows</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <span class="settings-label">RUNTIME</span>
+        <div class="settings-select-row">
+          <label for="notification-policy"><strong>Background notifications</strong><small>Controls passive monitoring updates; direct action results always remain visible.</small></label>
+          <select id="notification-policy">
+            <option value="errors_only">Errors only</option>
+            <option value="all_activity">All activity</option>
+            <option value="silent">Silent</option>
+          </select>
+        </div>
+        <label class="shutdown-preference" for="boost-mode">
+          <input id="boost-mode" type="checkbox" />
+          <span>
+            <strong>Boost model analysis</strong>
+            <small>Runs every enabled, admitted temporal expert on each completed segment and uses the GPU path when available. Higher power use. Disabled model choices remain off.</small>
+          </span>
+        </label>
+        <label class="shutdown-preference" for="keep-monitoring-after-exit">
+          <input id="keep-monitoring-after-exit" type="checkbox" />
+          <span>
+            <strong>Keep sensor running after Quit</strong>
+            <small>Closing the window now keeps Argus ready in the system tray. This controls what happens only when you choose Quit Argus.</small>
+          </span>
+        </label>
+        <button class="settings-setup-button" id="run-onboarding-button" type="button">
+          <strong>Run device setup again</strong>
+          <small>Recheck capture, storage, tools, and model readiness.</small>
+        </button>
+        <button class="settings-setup-button" id="replay-introduction-button" type="button">
+          <strong>Replay introduction</strong>
+          <small>Open the animated preview. Your monitoring settings stay unchanged.</small>
+        </button>
+      </div>
+
+      <section class="settings-group" aria-labelledby="model-settings-title">
+        <h3 class="settings-label" id="model-settings-title">MODEL SELECTION</h3>
+        <p class="model-settings-help" id="model-settings-help">Choose which models may run on future analysis segments. Enabled means requested, not loaded or verified. Models remain subject to runtime admission and routing; forecasts are not security verdicts.</p>
+        <div id="model-settings-list" aria-busy="true"></div>
+        <p class="model-settings-help" id="model-settings-status" role="status" aria-live="polite">Loading model preferences…</p>
+        <button class="button secondary" id="model-settings-retry" type="button" hidden>Reload model preferences</button>
+        <button class="button secondary" id="model-settings-reset" type="button" disabled>Restore model defaults</button>
+      </section>
+
+      <p class="settings-privacy"><span class="status-dot"></span>Saved locally; model changes apply to future analysis segments.</p>
+    </dialog>
+
+    <div class="onboarding-scrim" id="onboarding-scrim" hidden></div>
+    <section
+      class="onboarding-dialog"
+      id="onboarding-dialog"
+      aria-labelledby="onboarding-title"
+      aria-describedby="onboarding-subtitle"
+      aria-hidden="true"
+      hidden
+    >
+      <header class="onboarding-head">
+        <div class="onboarding-mark" aria-hidden="true">A</div>
+        <div>
+          <span>ARGUS DEVICE SETUP</span>
+          <h2 id="onboarding-title" tabindex="-1">Make this device yours.</h2>
+          <p id="onboarding-subtitle">Your device, your choices. Scroll through the checks, then open your workspace.</p>
+        </div>
+      </header>
+
+      <div class="onboarding-progress" aria-label="Setup progress">
+        <button type="button" data-setup-target="0">01 · Privacy</button>
+        <i></i>
+        <button type="button" data-setup-target="1">02 · Device checks</button>
+        <i></i>
+        <button type="button" data-setup-target="2">03 · Start</button>
+      </div>
+
+      <div class="onboarding-step" data-onboarding-step="0" tabindex="-1" role="region" aria-label="Privacy and local storage">
+        <span class="journey-step-number">01 / YOUR DATA</span><h3>Know what stays here.</h3>
+        <div class="onboarding-callout">
+          <span class="status-dot good"></span>
+          <div><strong>Traffic stays on this device</strong><small>Argus does not upload captures, features, or model results.</small></div>
+        </div>
+        <div class="onboarding-facts">
+          <article><strong>Bounded capture</strong><p>Live PCAP segments are deleted as newer segments are analyzed.</p></article>
+          <article><strong>Payload-free learning</strong><p>The daily journal retains causal numeric features, not packet payloads.</p></article>
+          <article><strong>Model availability</strong><p>Check model status and recovery steps in Diagnostics.</p></article>
+        </div>
+      </div>
+
+      <div class="onboarding-step" data-onboarding-step="1" tabindex="-1" role="region" aria-label="Device readiness checks">
+        <span class="journey-step-number">02 / THIS DEVICE</span><h3>Let's check the essentials.</h3>
+        <div class="onboarding-step-title">
+          <div><strong>Device readiness</strong><small>These are live backend checks, not sample values.</small></div>
+          <button class="button secondary" id="onboarding-refresh" type="button">Check again</button>
+        </div>
+        <div class="onboarding-checks" id="onboarding-checks" aria-live="polite">
+          <div class="onboarding-check pending"><span class="status-dot amber"></span><div><strong>Checking this device…</strong><small>Reading capture, storage, tool, and model status.</small></div></div>
+        </div>
+        <p class="onboarding-readiness-summary" id="onboarding-readiness-summary">Waiting for the runtime.</p>
+      </div>
+
+      <div class="onboarding-step" data-onboarding-step="2" tabindex="-1" role="region" aria-label="Monitoring preferences">
+        <span class="journey-step-number">03 / YOUR WORKSPACE</span><h3>Ready when you are.</h3>
+        <div class="onboarding-final-card">
+          <span class="onboarding-pulse" aria-hidden="true"></span>
+          <div><strong>Start continuous monitoring</strong><small>Windows may show one administrator prompt while Argus registers or repairs its native sensor.</small></div>
+        </div>
+        <label class="shutdown-preference onboarding-preference" for="onboarding-keep-monitoring">
+          <input id="onboarding-keep-monitoring" type="checkbox" />
+          <span><strong>Keep sensor running after Quit</strong><small>The close button hides Argus in the tray for instant reopening. This option applies only to Quit Argus.</small></span>
+        </label>
+        <p class="onboarding-footnote">You can change this later or rerun setup from User settings.</p>
+      </div>
+
+      <footer class="onboarding-actions">
+        <p id="onboarding-finish-status" role="status"></p>
+        <button class="onboarding-skip" id="onboarding-skip" type="button">Set up later</button>
+        <div>
+          <button class="button secondary" id="onboarding-back" type="button">Back to introduction</button>
+          <button class="button" id="onboarding-next" type="button">Finish setup and open Argus</button>
+        </div>
+      </footer>
+    </section>
+
+    <aside class="drawer" id="flow-drawer" aria-hidden="true" inert>
+      <div class="drawer-head">
+        <div>
+          <span>FLOW INSPECTOR</span>
+          <h2 id="drawer-title">Flow</h2>
+        </div>
+        <button id="drawer-close" aria-label="Close">×</button>
+      </div>
+      <div class="drawer-tabs">
+        <button class="drawer-tab active" data-drawer-tab="telemetry">Flow Telemetry</button>
+        <button class="drawer-tab" data-drawer-tab="hex">Payload Hex & Entropy</button>
+      </div>
+      <div id="drawer-tab-telemetry" class="drawer-tab-content active">
+        <div class="direction-card">
+          <div id="drawer-source">—</div>
+          <span>→</span>
+          <div id="drawer-target">—</div>
+        </div>
+        <div class="detail-grid" id="detail-grid"></div>
+        <div class="direction-split">
+          <div class="split-label">
+            <span>Direction balance</span><strong id="direction-value">—</strong>
+          </div>
+          <div class="split-track"><i id="direction-bar"></i></div>
+        </div>
+        <div class="evidence-block">
+          <span>CAPTURE EVIDENCE</span>
+          <p id="quality-evidence">No packet-quality anomalies observed.</p>
+        </div>
+        <div class="flow-defense-action-box" id="drawer-defense-box">
+          <div class="flow-defense-info">
+            <span class="flow-defense-label">ENDPOINT POLICY & ATTACK VERDICT</span>
+            <div id="drawer-block-status" class="flow-defense-status">Traffic is currently permitted.</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button id="drawer-allow-btn" class="button secondary" style="padding: 5px 10px; font-size: 11px; white-space: nowrap;">Allow</button>
+            <button id="drawer-toggle-block-btn" class="button" style="padding: 5px 12px; font-size: 11px; background: #f43f5e; border-color: #e11d48; white-space: nowrap;">Block</button>
+          </div>
+        </div>
+        <div class="drawer-action-row" style="margin-top: 14px; display: flex; gap: 8px;">
+          <button id="drawer-export-flow-pcap-btn" class="button secondary" style="flex: 1; padding: 7px 10px; font-size: 11px; display: flex; align-items: center; justify-content: center; gap: 5px;">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Export Flow PCAP
+          </button>
+          <button id="drawer-export-report-btn" class="button secondary" style="flex: 1; padding: 7px 10px; font-size: 11px; display: flex; align-items: center; justify-content: center; gap: 5px;">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            Incident Report
+          </button>
+        </div>
+      </div>
+      <div id="drawer-tab-hex" class="drawer-tab-content">
+        <div class="hex-controls">
+          <div class="hex-layer-legend">
+            <span class="legend-chip eth">Link (Ethernet)</span>
+            <span class="legend-chip ip">Network (IP)</span>
+            <span class="legend-chip trans">Transport</span>
+            <span class="legend-chip payload">Payload</span>
+          </div>
+          <div class="hex-entropy-badge" id="hex-entropy-rating">
+            <span>Entropy:</span> <strong id="hex-entropy-value">—</strong>
+          </div>
+        </div>
+        <div class="hex-packet-selector">
+          <label for="hex-packet-select">Packet:</label>
+          <select id="hex-packet-select" class="dropdown"></select>
+        </div>
+        <div id="hex-dump-container" class="hex-dump-container">
+          <pre class="hex-dump-pre" id="hex-dump-text">Select a flow to inspect raw packet bytes.</pre>
+        </div>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+    <script src="app.js?v=observatory-1"></script>
+    <script type="module" src="traffic-explorer.mjs?v=1"></script>
+    <script type="module" src="spatial/workspace.mjs?v=room-orbit-1"></script>
+    <script type="module" src="network-xray.mjs?v=1"></script>
+    <script type="module" src="simulation-lab.mjs?v=1"></script>
+  </body>
+</html>

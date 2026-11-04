@@ -14,8 +14,17 @@ I'm interested in working with organizations that would like to explore a pilot.
 
 ## Availability
 
-This repository currently contains a project overview. The application source, model files and installation instructions are being prepared for release; there isn't an installer here yet.
+The source and two AHEM forecasting models are in this repository. To build and run the Windows prototype, follow the [Windows setup guide](docs/BUILD_WINDOWS.md). There isn't a one-click installer yet.
+
+The public build uses its own settings and data directories. Monitoring starts only when you choose to start it. The newer AHEM model is experimental and disabled by default; it doesn't make security decisions.
 
 ## Research
 
 The [research overview](research/README.md) explains what AHEM has been tested on and what those tests can—and can't—tell us.
+
+## Roadmap
+
+- Make the Windows setup and first run easier on a fresh computer.
+- Work with pilot organizations to understand which views and alerts are useful.
+- Test detection quality, false alerts and resource use on independent traffic.
+- Add Linux and macOS support (in progress). Windows is the current target; the other platforms aren't ready for pilots yet.

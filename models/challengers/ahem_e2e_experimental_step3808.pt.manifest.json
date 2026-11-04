@@ -1,0 +1,23 @@
+{
+  "artifact_sha256": "f4ed02499db772df25a5273d182b31c70ddebc1c782a45e787f39cc4dec27593",
+  "config": {
+    "horizon": 10000,
+    "key_dim": 64,
+    "local_packets": 128,
+    "phase_width": 128,
+    "slots": 16,
+    "width": 256
+  },
+  "evaluation_status": "unvalidated_recovered_incomplete_run",
+  "includes_optimizer_or_rng_state": false,
+  "inference_only": true,
+  "parameters": 921229,
+  "promotion_eligible": false,
+  "publication_evidence": false,
+  "schema": "argus.ahem-e2e-inference-weights/v1",
+  "security_detector": false,
+  "seed": 20261018,
+  "source_checkpoint_sha256": "d206c62997c283bd050d4a29e09988a1aa431e73b4fbd1729bb0f2c94ce3549f",
+  "state_elements": 921231,
+  "step": 3808
+}
