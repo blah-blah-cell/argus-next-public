@@ -108,7 +108,7 @@ missing forecasts as evidence of benign traffic.
 
 ## Optional distributable ZIP
 
-After a successful Release build, use PowerShell 7 or newer:
+After a successful Release build, use Windows PowerShell 5.1 or newer:
 
 ```powershell
 .\scripts\package-windows.ps1
@@ -127,3 +127,8 @@ copied. Every included file has a SHA-256 entry in `SHA256SUMS.txt`. The script
 also prints the ZIP hash. It refuses existing output; choose a fresh
 `-OutputDirectory` when rebuilding. This is not a signed installer or a verified
 clean-machine deployment.
+
+To build the per-user setup program from that staging directory, run
+`.\scripts\build-installer.ps1`. It appends a hash-verified payload to a small
+stub executable; the result installs to `%LOCALAPPDATA%\Programs\ArgusNextPublic`
+and registers an uninstall entry. See [the install guide](INSTALL_WINDOWS.md).

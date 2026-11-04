@@ -1,0 +1,17 @@
+[package]
+name = "argus-setup"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Per-user Windows setup program for the Argus Next public prototype."
+
+[[bin]]
+name = "argus-setup"
+path = "src/bin/stub.rs"
+
+[[bin]]
+name = "argus-setup-builder"
+path = "src/bin/builder.rs"
+
+# Standalone workspace: the installer must not change the application's lockfile.
+[workspace]

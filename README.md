@@ -14,7 +14,9 @@ I'm interested in working with organizations that would like to explore a pilot.
 
 ## Availability
 
-The source and two AHEM forecasting models are in this repository. To build and run the Windows prototype, follow the [Windows setup guide](docs/BUILD_WINDOWS.md). There isn't a one-click installer yet.
+Download the setup program from the [latest release](https://github.com/blah-blah-cell/argus-next-public/releases) and run it. It installs for the current user without administrator rights, adds Start menu and desktop shortcuts, and starts with capture stopped. See the [Windows install guide](docs/INSTALL_WINDOWS.md).
+
+The setup program is unsigned, so Windows may show a SmartScreen warning. The source and two AHEM forecasting models are in this repository; to build from source, follow the [Windows setup guide](docs/BUILD_WINDOWS.md). Model forecasting needs the optional Python runtime described there, and the app reports model readiness rather than hiding it.
 
 The public build uses its own settings and data directories. Monitoring starts only when you choose to start it. The newer AHEM model is experimental and disabled by default; it doesn't make security decisions.
 
@@ -24,7 +26,6 @@ The [research overview](research/README.md) explains what AHEM has been tested o
 
 ## Roadmap
 
-- Make the Windows setup and first run easier on a fresh computer.
-- Work with pilot organizations to understand which views and alerts are useful.
-- Test detection quality, false alerts and resource use on independent traffic.
-- Add Linux and macOS support (in progress). Windows is the current target; the other platforms aren't ready for pilots yet.
+The public plan is in [docs/ROADMAP.md](docs/ROADMAP.md). It covers signing and supply-chain trust, removing the Python runtime from the installed app, retention and alert delivery, a multi-site sensor and collector, and Linux and macOS work.
+
+Windows is the current target. Linux and macOS support is in progress and those platforms aren't ready for pilots yet.
