@@ -94,11 +94,11 @@ cargo test --locked --workspace --all-targets
 cargo fmt --all --check
 node scripts/validate-desktop-ui.cjs
 node --test scripts/test-release-runtime.cjs
-.\target\release\argus-nids.exe --json
+.\target\release\argus-nids.exe --json --pktmon-probe
 ```
 
-The last command runs a deterministic synthetic pipeline, not a network capture
-or a trained-model security evaluation. See
+The last command probes Pktmon readiness without starting packet capture; it is
+not a trained-model security evaluation. See
 [the CLI guide](../crates/argus-nids/RUN_WINDOWS.md) for capture-file replay.
 
 Building successfully does not verify UAC behavior, sensor compatibility,

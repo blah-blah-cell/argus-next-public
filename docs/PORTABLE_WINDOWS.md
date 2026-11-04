@@ -49,10 +49,10 @@ redistribution rights for all source, weights, or third-party dependencies.
 The embedded Three.js UI dependency retains its separate MIT notice at
 `THIRD_PARTY/three-LICENSE.txt`.
 
-For a model-free synthetic CLI check (does not capture traffic):
+For a Pktmon readiness probe (does not capture traffic):
 
 ```powershell
-.\argus-nids.exe --json
+.\argus-nids.exe --json --pktmon-probe
 ```
 
 The distribution does not silently uninstall its task or delete collected data.

@@ -1,15 +1,15 @@
 # Run Argus NIDS on Windows
 
-From the repository root, run the deterministic vertical slice:
+From the repository root, probe Pktmon readiness without starting a capture:
 
 ```powershell
-cargo run -p argus-nids
+cargo run -p argus-nids -- --pktmon-probe
 ```
 
 Machine-readable status and evidence use a versioned JSON envelope:
 
 ```powershell
-cargo run -p argus-nids -- --json
+cargo run -p argus-nids -- --json --pktmon-probe
 cargo run -p argus-nids -- --json --pcap C:\path\to\capture.pcapng
 cargo run -p argus-nids -- --json --pktmon-probe
 ```
@@ -19,11 +19,9 @@ Replay a bounded classic PCAP file or measure vertical-slice throughput:
 ```powershell
 cargo run --release -p argus-nids -- --pcap C:\path\to\capture.pcap
 cargo run --release -p argus-nids -- --benchmark C:\path\to\capture.pcap
-cargo run --release -p argus-nids -- --self-benchmark 100000
 ```
 
-`--self-benchmark` measures the in-memory deterministic pipeline and is labeled synthetic; the
-PCAP benchmark additionally includes file parsing and normalization.
+The PCAP benchmark includes file parsing and normalization.
 
 The executable does not open a live network adapter. Windows Pktmon's
 truthful integration is stopped-session ETL conversion rather than this pipeline's live pull
