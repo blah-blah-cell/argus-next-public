@@ -88,8 +88,28 @@ local disk, and uninstall keeps them unless you say otherwise.
 
 ## Research
 
-The [research overview](research/README.md) explains what AHEM has been tested on
-and what those tests can — and can't — tell us.
+The question behind Argus is whether a small model can use a flow's own earlier,
+causally observed transitions — only packets that have already arrived, never
+future ones — to forecast that flow's next packet size and arrival delay. AHEM is
+the attempt to answer it with a model small enough to run on an ordinary machine.
+
+In a frozen experiment on a selected subset of CSE-CIC-IDS2018, AHEM v6.1 had
+lower weighted forecasting loss than a similarly sized flow-lane LSTM. That is a
+forecast result on returning flows with eligible history, not a detection result.
+The two models did not receive identical recent global inputs, and the sample did
+not cover every packet or every kind of network, so the comparison isolates the
+effect of memory only partly. It says nothing yet about false-positive rates or
+how the model behaves on a real network. A later, larger experimental model
+remains disabled by default for the same reason.
+
+The [research overview](research/README.md) sets out the method, the caveats, the
+outcomes that did not reproduce, and what is and isn't published. The shipped
+weights are inference-only and hash-verified; their terms are in
+[models/NOTICE.md](models/NOTICE.md).
+
+I would rather publish a small honest result than a large ambiguous one, so
+negative and inconclusive findings are documented next to the positive ones. If
+you are reviewing the method and something is missing, open an issue and ask.
 
 ## Development
 
