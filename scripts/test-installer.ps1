@@ -52,10 +52,21 @@ $fileCount = (Get-ChildItem -LiteralPath $InstallDirectory -Recurse -File).Count
 if ($fileCount -lt 200) { throw "Only $fileCount files installed; expected the full package." }
 
 Write-Host "Installed $fileCount files. Uninstalling."
-& $uninstaller --uninstall --silent
-if ($LASTEXITCODE -ne 0) { throw "Uninstall failed with exit code $LASTEXITCODE." }
 
-$deadline = (Get-Date).AddSeconds(45)
+# The product copies itself to %TEMP% and re-runs with --from-temp so it can
+# delete the directory it lives in. Run that same step in the foreground here:
+# the detached version hides its exit code, which turns any failure into a
+# silent timeout.
+$tempUninstaller = Join-Path ([IO.Path]::GetTempPath()) ("argus-uninstall-" + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.exe')
+Copy-Item -LiteralPath $uninstaller -Destination $tempUninstaller -Force
+$uninstallOutput = & $tempUninstaller --uninstall --from-temp --silent --install-dir $InstallDirectory 2>&1
+$uninstallExit = $LASTEXITCODE
+Remove-Item -LiteralPath $tempUninstaller -Force -ErrorAction SilentlyContinue
+if ($uninstallExit -ne 0) {
+    throw "Uninstall failed with exit code $uninstallExit. Output: $($uninstallOutput -join ' ')"
+}
+
+$deadline = (Get-Date).AddSeconds(60)
 while ((Test-Path -LiteralPath $InstallDirectory) -and (Get-Date) -lt $deadline) {
     Start-Sleep -Milliseconds 500
 }
