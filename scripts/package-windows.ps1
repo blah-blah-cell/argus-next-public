@@ -67,7 +67,9 @@ $manifest = @(Get-ChildItem -LiteralPath $PackageRoot -Recurse -File | Sort-Obje
     $relative = [IO.Path]::GetRelativePath($PackageRoot, $_.FullName).Replace('\', '/')
     '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $relative
 })
-[IO.File]::WriteAllLines((Join-Path $PackageRoot 'SHA256SUMS.txt'), $manifest, [Text.UTF8Encoding]::new($false))
+# Write LF only: GNU sha256sum and WSL/Git Bash would otherwise treat the CR as part of the filename.
+$manifestText = ($manifest -join "`n") + "`n"
+[IO.File]::WriteAllText((Join-Path $PackageRoot 'SHA256SUMS.txt'), $manifestText, [Text.UTF8Encoding]::new($false))
 Compress-Archive -LiteralPath $PackageRoot -DestinationPath $Archive -CompressionLevel Optimal
 Write-Host "Package: $Archive"
 Write-Host "SHA256: $((Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant())"
