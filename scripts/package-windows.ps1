@@ -24,6 +24,7 @@ $files = [ordered]@{
     'scripts/setup-windows-model-runtime.ps1' = 'scripts/setup-windows-model-runtime.ps1'
     'scripts/run-desktop.ps1' = 'scripts/run-desktop.ps1'
     'docs/PORTABLE_WINDOWS.md' = 'README.md'
+    'desktop/ui/spatial/assets/NOTICE.md' = 'THIRD_PARTY/hero-assets-NOTICE.md'
     'desktop/ui/vendor/three/LICENSE' = 'THIRD_PARTY/three-LICENSE.txt'
 }
 $optionalModels = @(

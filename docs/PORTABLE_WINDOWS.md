@@ -48,6 +48,7 @@ provided at preparation time. Do not assume that declaration grants blanket
 redistribution rights for all source, weights, or third-party dependencies.
 The embedded Three.js UI dependency retains its separate MIT notice at
 `THIRD_PARTY/three-LICENSE.txt`.
+The included hero asset provenance notice is at `THIRD_PARTY/hero-assets-NOTICE.md`.
 
 For a Pktmon readiness probe (does not capture traffic):
 
