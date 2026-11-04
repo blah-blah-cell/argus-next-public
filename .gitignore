@@ -1,5 +1,6 @@
 /target/
 /dist/
+/installer/target/
 /.venv/
 /python/.venv/
 __pycache__/
