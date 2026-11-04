@@ -1,0 +1,120 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    name: Build, sign, and publish
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$($version.Contains('-'))" >> $env:GITHUB_OUTPUT
+
+      - name: Tests
+        run: cargo test --locked --workspace --all-targets
+
+      - name: Build release binaries
+        run: ./scripts/build-windows.ps1
+        shell: pwsh
+
+      - name: Build portable package
+        run: ./scripts/package-windows.ps1 -OutputDirectory dist
+        shell: pwsh
+
+      - name: Build setup program
+        run: ./scripts/build-installer.ps1 -PackageDirectory dist/ArgusNextPublic-windows-x64 -OutputPath dist/setup/ArgusNextPublic-windows-x64-setup.exe -Version ${{ steps.version.outputs.version }}
+        shell: pwsh
+
+      - name: Installer smoke test
+        run: ./scripts/test-installer.ps1 -SetupPath dist/setup/ArgusNextPublic-windows-x64-setup.exe
+        shell: pwsh
+
+      - name: Optional Authenticode signing
+        if: ${{ secrets.WINDOWS_PFX_BASE64 != '' }}
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String('${{ secrets.WINDOWS_PFX_BASE64 }}'))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw 'signtool.exe not found' }
+          $files = @(
+            'dist/setup/ArgusNextPublic-windows-x64-setup.exe',
+            'dist/ArgusNextPublic-windows-x64/argus-desktop.exe',
+            'dist/ArgusNextPublic-windows-x64/argus-nids.exe',
+            'dist/ArgusNextPublic-windows-x64/argus-pktmon-stream.exe'
+          )
+          foreach ($file in $files) {
+            & $signtool.FullName sign /fd SHA256 /f $pfx /p '${{ secrets.WINDOWS_PFX_PASSWORD }}' /tr http://timestamp.digicert.com /td SHA256 $file
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed for $file" }
+          }
+          Remove-Item $pfx -Force
+
+      - name: Bundle portable package
+        shell: pwsh
+        run: |
+          $zip = 'dist/ArgusNextPublic-windows-x64.zip'
+          $setup = 'dist/setup/ArgusNextPublic-windows-x64-setup.exe'
+          $lines = Get-ChildItem dist/ArgusNextPublic-windows-x64 -Recurse -File | ForEach-Object {
+            $rel = [IO.Path]::GetRelativePath((Resolve-Path 'dist/ArgusNextPublic-windows-x64'), $_.FullName)
+            '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $rel
+          }
+          $lines | Set-Content -LiteralPath dist/SHA256SUMS.txt -Encoding utf8NoBOM
+          @(
+            (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() + '  ArgusNextPublic-windows-x64.zip',
+            (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() + '  ArgusNextPublic-windows-x64-setup.exe'
+          ) | Set-Content -LiteralPath dist/SHA256SUMS-RELEASE.txt -Encoding utf8NoBOM
+
+      - name: Software bill of materials
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: dist/sbom/argus-next.cdx.json
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/ArgusNextPublic-windows-x64-setup.exe
+            dist/ArgusNextPublic-windows-x64.zip
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $prerelease = '${{ steps.version.outputs.prerelease }}'
+          $args = @(
+            'release', 'create', '${{ github.ref_name }}',
+            'dist/ArgusNextPublic-windows-x64-setup.exe',
+            'dist/ArgusNextPublic-windows-x64.zip',
+            'dist/SHA256SUMS-RELEASE.txt',
+            'dist/sbom/argus-next.cdx.json',
+            '--title', "Argus Next ${{ steps.version.outputs.version }}",
+            '--generate-notes'
+          )
+          if ($prerelease -eq 'True') { $args += '--prerelease' }
+          gh @args

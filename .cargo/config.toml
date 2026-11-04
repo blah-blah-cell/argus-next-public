@@ -1,0 +1,6 @@
+[alias]
+xtest = "test --locked --workspace --all-targets"
+xlint = "clippy --workspace --all-targets --all-features -- -D warnings"
+xfmt = "fmt --all"
+# The installer is its own workspace so it never changes the application lockfile.
+xinstaller = "test --locked --release --manifest-path installer/Cargo.toml"

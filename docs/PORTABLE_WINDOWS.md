@@ -42,10 +42,10 @@ Forecasts are research outputs, not validated attack detections.
 itself. Hashes establish integrity relative to the manifest, not publisher
 authenticity. There is no code signature or automatic updater.
 
-Licensing is pending the author's confirmation. The source workspace metadata
-declares Apache-2.0, but no root license text or separate model-weight license was
-provided at preparation time. Do not assume that declaration grants blanket
-redistribution rights for all source, weights, or third-party dependencies.
+Source code and documentation are licensed under Apache-2.0; the root `LICENSE`
+file is authoritative. Model weights are distributed separately from that license
+and remain research artifacts for evaluation use until a model license is
+published: see `models/NOTICE.md`. Third-party components keep their own terms.
 The embedded Three.js UI dependency retains its separate MIT notice at
 `THIRD_PARTY/three-LICENSE.txt`.
 The included hero asset provenance notice is at `THIRD_PARTY/hero-assets-NOTICE.md`.

@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Lint, UI, and metadata
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Formatting
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Desktop UI sources and tests
+        run: node scripts/validate-desktop-ui.cjs
+      - name: Release isolation tests
+        run: node --test scripts/test-release-runtime.cjs
+      - name: Release metadata consistency
+        run: node scripts/check-release-metadata.cjs
+
+  test:
+    name: Rust and installer tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal
+      - uses: Swatinem/rust-cache@v2
+      - name: Workspace tests
+        run: cargo test --locked --workspace --all-targets
+      - name: Setup program tests
+        run: cargo test --locked --release --manifest-path installer/Cargo.toml
+
+  python:
+    name: Research code hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install linter
+        run: pip install ruff==0.12.12
+      - name: Syntax and undefined-name checks
+        run: ruff check --select E9,F63,F7,F82 python/src python/tests
+      - name: Byte-compile research package
+        run: python -m compileall -q python/src python/tests
+
+  supply-chain:
+    name: Supply chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency, license, and source policy
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  installer-smoke:
+    name: Installer install and uninstall
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    needs: [test]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal
+      - uses: Swatinem/rust-cache@v2
+      - name: Build release binaries and native sidecar
+        run: ./scripts/build-windows.ps1
+        shell: pwsh
+      - name: Build portable package
+        run: ./scripts/package-windows.ps1 -OutputDirectory dist
+        shell: pwsh
+      - name: Build setup program
+        run: ./scripts/build-installer.ps1 -PackageDirectory dist/ArgusNextPublic-windows-x64 -OutputPath dist/setup/ArgusNextPublic-windows-x64-setup.exe -Version 0.1.0
+        shell: pwsh
+      - name: Verify, install, and uninstall
+        run: ./scripts/test-installer.ps1 -SetupPath dist/setup/ArgusNextPublic-windows-x64-setup.exe
+        shell: pwsh

@@ -1,0 +1,68 @@
+name: Bug report
+description: Report something that does not work as documented.
+title: "bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Do not attach packet captures, credentials, cookies,
+        or personal data. Security issues belong in the private process described
+        in SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release tag, or the commit you built.
+      placeholder: v0.1.0-alpha.1
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2 x64
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Setup program from the release page
+        - Portable ZIP
+        - Built from source
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the app
+        2. ...
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include error text or a redacted screenshot. Never include capture bytes.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I have not included personal data, credentials, or packet captures.
+          required: true
+        - label: This is not a security vulnerability (those follow SECURITY.md).
+          required: true

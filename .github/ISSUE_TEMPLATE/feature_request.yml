@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a capability or an improvement.
+title: "feature: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check docs/ROADMAP.md first; the idea may already be planned. Please do not
+        include captured traffic or personal data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the situation, not the implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help?
+    validations:
+      required: true
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Who is this for?
+      options:
+        - A small organization without a security team
+        - An analyst or IT administrator
+        - Research and model evaluation
+        - Development and packaging
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints to respect
+      options:
+        - label: It should work without a cloud service.
+        - label: It should not start capturing traffic automatically.
+        - label: It should keep metadata-only defaults.

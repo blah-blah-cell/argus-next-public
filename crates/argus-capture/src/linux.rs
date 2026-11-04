@@ -626,10 +626,7 @@ mod tests {
     #[test]
     fn parses_proc_net_ipv4_and_ipv6_addresses() {
         // 0100007F -> 127.0.0.1
-        assert_eq!(
-            parse_hex_ipv4("0100007F"),
-            Some(Ipv4Addr::new(127, 0, 0, 1))
-        );
+        assert_eq!(parse_hex_ipv4("0100007F"), Some(Ipv4Addr::LOCALHOST));
         // 6401A8C0 -> 192.168.1.100
         assert_eq!(
             parse_hex_ipv4("6401A8C0"),
@@ -652,7 +649,7 @@ mod tests {
 ";
         let mut map = HashMap::new();
         map.insert(
-            424243,
+            424_243,
             LinuxProcessOwner {
                 pid: 1337,
                 name: "argus-sensor".to_owned(),
@@ -662,10 +659,7 @@ mod tests {
 
         let rows = parse_proc_net_table(sample, "TCP", false, &map);
         assert_eq!(rows.len(), 2);
-        assert_eq!(
-            rows[0].local_address,
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
-        );
+        assert_eq!(rows[0].local_address, IpAddr::V4(Ipv4Addr::LOCALHOST));
         assert_eq!(rows[0].local_port, 3000);
         assert_eq!(rows[0].state, "LISTEN");
         assert!(rows[0].process.is_none());

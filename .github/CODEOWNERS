@@ -1,0 +1,12 @@
+# Default owner for the public prototype.
+*       @blah-blah-cell
+
+# Packaging and release metadata need explicit review.
+/installer/                     @blah-blah-cell
+/scripts/package-windows.ps1     @blah-blah-cell
+/scripts/build-installer.ps1     @blah-blah-cell
+/.github/workflows/              @blah-blah-cell
+/deny.toml                      @blah-blah-cell
+
+# Model artifacts and their manifests.
+/models/                        @blah-blah-cell
