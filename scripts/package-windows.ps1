@@ -75,7 +75,23 @@ $manifest = @(Get-ChildItem -LiteralPath $PackageRoot -Recurse -File | Sort-Obje
 # Write LF only: GNU sha256sum and WSL/Git Bash would otherwise treat the CR as part of the filename.
 $manifestText = ($manifest -join "`n") + "`n"
 [IO.File]::WriteAllText((Join-Path $PackageRoot 'SHA256SUMS.txt'), $manifestText, [Text.UTF8Encoding]::new($false))
-Compress-Archive -LiteralPath $PackageRoot -DestinationPath $Archive -CompressionLevel Optimal
+# Build the archive entry by entry: Compress-Archive on Windows PowerShell 5.1 stores
+# backslash separators, which is not the separator the ZIP format specifies.
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$archiveHandle = [IO.Compression.ZipFile]::Open($Archive, [IO.Compression.ZipArchiveMode]::Create)
+try {
+    $packageFolder = Split-Path -Leaf $PackageRoot
+    foreach ($file in Get-ChildItem -LiteralPath $PackageRoot -Recurse -File | Sort-Object FullName) {
+        $entryName = $packageFolder + '/' + (Get-PackageRelativePath $PackageRoot $file.FullName).Replace('\', '/')
+        $entry = $archiveHandle.CreateEntry($entryName, [IO.Compression.CompressionLevel]::Optimal)
+        $entryStream = $entry.Open()
+        try {
+            $source = [IO.File]::OpenRead($file.FullName)
+            try { $source.CopyTo($entryStream) } finally { $source.Dispose() }
+        } finally { $entryStream.Dispose() }
+    }
+} finally { $archiveHandle.Dispose() }
 Write-Host "Package: $Archive"
 Write-Host "SHA256: $((Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant())"
 Write-Host 'No Python environment, user data, packet captures or ONNX runtime is included.'
