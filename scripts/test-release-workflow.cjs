@@ -36,3 +36,7 @@ test('manual validation cannot publish a release', () => {
   assert.match(workflow, /name: Upload validation artifacts\s+if: github\.event_name == 'workflow_dispatch'/);
   assert.match(workflow, /name: Publish release\s+if: github\.event_name == 'push'/);
 });
+
+test('SBOM destination exists before the scanner writes to it', () => {
+  assert.match(workflow, /name: Prepare SBOM output directory[\s\S]*New-Item -ItemType Directory -Force -Path dist\/sbom[\s\S]*name: Software bill of materials/);
+});
