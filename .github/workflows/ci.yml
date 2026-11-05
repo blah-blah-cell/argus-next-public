@@ -36,6 +36,8 @@ jobs:
         run: node scripts/validate-desktop-ui.cjs
       - name: Release isolation tests
         run: node --test scripts/test-release-runtime.cjs
+      - name: Release workflow integrity tests
+        run: node --test scripts/test-release-workflow.cjs
       - name: Release metadata consistency
         run: node scripts/check-release-metadata.cjs
 
@@ -51,6 +53,9 @@ jobs:
         run: cargo test --locked --workspace --all-targets
       - name: Setup program tests
         run: cargo test --locked --release --manifest-path installer/Cargo.toml
+      - name: Native capture and storage-budget tests
+        run: ./native/pktmon-stream/build.ps1 -Configuration Debug
+        shell: pwsh
 
   python:
     name: Research code hygiene

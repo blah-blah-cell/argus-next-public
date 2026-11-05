@@ -3,11 +3,23 @@ targets = ["x86_64-pc-windows-msvc"]
 
 [advisories]
 yanked = "deny"
-ignore = []
+# The unic-* crates are unmaintained and reachable only through
+# tauri-utils -> urlpattern. There is no upgrade path and no known
+# vulnerability; revisit when Tauri drops urlpattern.
+ignore = [
+  { id = "RUSTSEC-2025-0075", reason = "unmaintained unic-char-range, transitive via tauri-utils" },
+  { id = "RUSTSEC-2025-0080", reason = "unmaintained unic-common, transitive via tauri-utils" },
+  { id = "RUSTSEC-2025-0081", reason = "unmaintained unic-char-property, transitive via tauri-utils" },
+  { id = "RUSTSEC-2025-0098", reason = "unmaintained unic-ucd-version, transitive via tauri-utils" },
+  { id = "RUSTSEC-2025-0100", reason = "unmaintained unic-ucd-ident, transitive via tauri-utils" },
+]
 
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# Workspace crates depend on each other by path with no published version yet.
+# External wildcard requirements are still denied.
+allow-wildcard-paths = true
 deny = []
 
 [licenses]
