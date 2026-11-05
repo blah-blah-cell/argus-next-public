@@ -14,7 +14,7 @@ often it raises false alerts. Please don't rely on it as your only security tool
 
 ## Current status
 
-The [Windows alpha.2 prerelease](https://github.com/blah-blah-cell/argus-next-public/releases/tag/v0.1.0-alpha.2)
+The [Windows alpha.3 prerelease](https://github.com/blah-blah-cell/argus-next-public/releases/tag/v0.1.0-alpha.3)
 has passed a fresh install/uninstall smoke test on a GitHub Windows runner. It is
 unsigned and remains an early prototype; it is not yet ready for an NGO deployment.
 **Do not install or run the uninstaller from the older alpha.1 release.**
@@ -30,10 +30,9 @@ Live capture is opt-in and may require administrator approval.
 - The Microsoft Visual C++ x64 runtime.
 - Pktmon API support for live capture.
 
-For a supervised evaluation, download the alpha.2 setup from the release page and
-check its hash against the value in the release notes. Its checksum file has a
-formatting error; a matching hash checks the download against the published value,
-not the publisher's identity. Read the
+For a supervised evaluation, download the alpha.3 setup from the release page and
+check its hash against `SHA256SUMS-RELEASE.txt`. A matching hash checks the download
+against the published value, not the publisher's identity. Read the
 [installation guide](docs/INSTALL_WINDOWS.md) before proceeding.
 
 ## What it does
