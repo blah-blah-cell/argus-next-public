@@ -205,6 +205,7 @@
             <p class="eyebrow"><span class="eyebrow-live"></span> WINDOWS SENSOR · LOCAL RUNTIME</p>
             <h1 tabindex="-1">Network overview</h1>
             <p class="header-subtitle">Private, real-time traffic intelligence on this device</p>
+            <p id="analysis-source" class="analysis-source">No capture analysis loaded.</p>
           </div>
           <div class="header-actions">
             <div class="capture-state">
@@ -265,6 +266,14 @@
             </button>
           </div>
         </header>
+
+        <section class="offline-replay panel" id="offline-replay" aria-label="Offline capture replay" aria-busy="false">
+          <div>
+            <button class="button" id="import-replay-button" type="button" aria-describedby="import-replay-hint import-replay-status" disabled>Import capture &amp; replay</button>
+            <p id="import-replay-hint">Open a local PCAP or PCAPNG. No live capture, baseline updates, or saved alerts.</p>
+          </div>
+          <p id="import-replay-status" role="status" aria-live="polite" aria-atomic="true">No file imported. Capture files may contain sensitive packet data and stay on this device.</p>
+        </section>
 
         <div class="notice" id="notice" role="status" aria-live="polite" aria-atomic="true">
           <span class="notice-icon">i</span
@@ -1104,7 +1113,7 @@
           <div><strong>Traffic stays on this device</strong><small>Argus does not upload captures, features, or model results.</small></div>
         </div>
         <div class="onboarding-facts">
-          <article><strong>Bounded capture</strong><p>Live PCAP segments are deleted as newer segments are analyzed.</p></article>
+          <article><strong>Local capture</strong><p>Temporary PCAP segments can contain packet payloads. Handle them as sensitive data.</p></article>
           <article><strong>Payload-free learning</strong><p>The daily journal retains causal numeric features, not packet payloads.</p></article>
           <article><strong>Model availability</strong><p>Check model status and recovery steps in Diagnostics.</p></article>
         </div>

@@ -31,6 +31,10 @@ register the `ArgusNextPublicSensor` scheduled task. A desktop shortcut named
 `Argus Next Public` can be created on launch. Closing the window can leave the app
 in its tray; use the tray's Quit command to exit.
 
+Temporary live PCAP segments can contain packet payloads and should be treated as
+sensitive. The separate learning journal stores numeric features without payloads;
+this does not make the raw capture metadata-only.
+
 State and captures default to `%LOCALAPPDATA%\ArgusNextPublic`, separate from the
 private developer app. Do not set `ARGUS_DEV_ROOT` or `ARGUS_CAPTURE_ROOT` to an
 existing private app directory. These and other `ARGUS_*` environment overrides

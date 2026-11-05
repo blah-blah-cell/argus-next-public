@@ -10,7 +10,8 @@
 
     Captured data is left alone (uninstall never deletes it), and the desktop app
     is never started, so this is safe to run on a machine that already has Argus
-    installed elsewhere.
+    installed elsewhere. The test refuses to run if an Argus installation or
+    shortcut is already registered, because these are shared per-user resources.
 
 .PARAMETER SetupPath
     Path to ArgusNextPublic-windows-x64-setup.exe.
@@ -29,14 +30,24 @@ $setup = (Resolve-Path -LiteralPath $SetupPath).Path
 if (-not $InstallDirectory) {
     $InstallDirectory = Join-Path ([IO.Path]::GetTempPath()) ("argus-smoke-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 }
+$InstallDirectory = [IO.Path]::GetFullPath($InstallDirectory)
+if (Test-Path -LiteralPath $InstallDirectory) {
+    throw "Install directory already exists; choose a fresh directory: $InstallDirectory"
+}
+$sharedPaths = @(
+    'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ArgusNextPublic',
+    (Join-Path ([Environment]::GetFolderPath('Programs')) 'Argus Next Public.lnk'),
+    (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Argus Next Public.lnk')
+)
+foreach ($sharedPath in $sharedPaths) {
+    if (Test-Path -LiteralPath $sharedPath) {
+        throw "Existing Argus registration or shortcut found; use a clean test account: $sharedPath"
+    }
+}
 
 Write-Host "Verifying payload: $setup"
 & $setup --verify
 if ($LASTEXITCODE -ne 0) { throw "Payload verification failed with exit code $LASTEXITCODE." }
-
-if (Test-Path -LiteralPath $InstallDirectory) {
-    Remove-Item -LiteralPath $InstallDirectory -Recurse -Force
-}
 
 Write-Host "Installing to $InstallDirectory"
 & $setup --silent --install-dir $InstallDirectory
@@ -52,10 +63,21 @@ $fileCount = (Get-ChildItem -LiteralPath $InstallDirectory -Recurse -File).Count
 if ($fileCount -lt 200) { throw "Only $fileCount files installed; expected the full package." }
 
 Write-Host "Installed $fileCount files. Uninstalling."
-& $uninstaller --uninstall --silent
-if ($LASTEXITCODE -ne 0) { throw "Uninstall failed with exit code $LASTEXITCODE." }
 
-$deadline = (Get-Date).AddSeconds(45)
+# The product copies itself to %TEMP% and re-runs with --from-temp so it can
+# delete the directory it lives in. Run that same step in the foreground here:
+# the detached version hides its exit code, which turns any failure into a
+# silent timeout.
+$tempUninstaller = Join-Path ([IO.Path]::GetTempPath()) ("argus-uninstall-" + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.exe')
+Copy-Item -LiteralPath $uninstaller -Destination $tempUninstaller -Force
+$uninstallOutput = & $tempUninstaller --uninstall --from-temp --silent --install-dir $InstallDirectory 2>&1
+$uninstallExit = $LASTEXITCODE
+Remove-Item -LiteralPath $tempUninstaller -Force -ErrorAction SilentlyContinue
+if ($uninstallExit -ne 0) {
+    throw "Uninstall failed with exit code $uninstallExit. Output: $($uninstallOutput -join ' ')"
+}
+
+$deadline = (Get-Date).AddSeconds(60)
 while ((Test-Path -LiteralPath $InstallDirectory) -and (Get-Date) -lt $deadline) {
     Start-Sleep -Milliseconds 500
 }

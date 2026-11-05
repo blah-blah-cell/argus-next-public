@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 mod query_cache;
+mod replay_import;
 
 use std::{
     cmp::Reverse,
@@ -2068,6 +2069,7 @@ struct HealthView {
     processed_packets: u64,
     flows: usize,
     alerts: u64,
+    non_ip_records: u64,
     unsupported_records: u64,
     malformed_records: u64,
     reported_lost_packets: u64,
@@ -2833,6 +2835,24 @@ fn collect_captures(
 }
 
 #[tauri::command]
+async fn choose_replay_capture() -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let selected = replay_import::pick_capture()?;
+        if let Some(path) = selected.as_deref()
+            && generated_live_capture_path(Path::new(path))?
+        {
+            return Err(
+                "This file belongs to the live sensor. Choose a saved offline capture instead."
+                    .to_owned(),
+            );
+        }
+        Ok(selected)
+    })
+    .await
+    .map_err(|error| format!("capture picker worker failed: {error}"))?
+}
+
+#[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 async fn replay_capture(
     path: String,
@@ -2846,14 +2866,31 @@ async fn replay_capture(
         );
     }
     let history_key = generated_live_capture_key(Path::new(&path))?;
-    let run = tauri::async_runtime::spawn_blocking(move || replay_path(Path::new(&path)))
-        .await
-        .map_err(|error| error.to_string())??;
-    if let Some(history_key) = history_key {
+    let is_live = history_key.is_some();
+    let run = tauri::async_runtime::spawn_blocking(move || {
+        replay_path_with_policy(Path::new(&path), is_live)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    if let Some(history_key) = history_key.as_deref() {
         history
             .lock()
             .map_err(|_| "live history lock poisoned")?
-            .record(&history_key, &run)?;
+            .record(history_key, &run)?;
+    }
+    record_generated_live_replay_alerts(history_key.as_deref(), &run, &alerts);
+    Ok(run)
+}
+
+fn record_generated_live_replay_alerts(
+    live_segment_key: Option<&str>,
+    run: &RunView,
+    alerts: &Mutex<AlertManager>,
+) {
+    // Reuse the history provenance gate: saved/imported captures keep their
+    // verdicts in the returned RunView, never in the shared live alert stream.
+    if live_segment_key.is_none() {
+        return;
     }
     if let Ok(mut alert_mgr) = alerts.lock() {
         for flow in &run.flows {
@@ -2868,7 +2905,6 @@ async fn replay_capture(
             alert_mgr.record_flow_attack(flow);
         }
     }
-    Ok(run)
 }
 
 #[tauri::command]
@@ -3801,6 +3837,9 @@ async fn try_experimental_cnn(
         .clone();
     let worker = Arc::clone(worker.inner());
     let monitor = Arc::clone(monitor.inner());
+    // Resolve provenance while the generated segment still exists: the closure
+    // consumes live captures after inference, but saved captures remain isolated.
+    let live_segment_key = generated_live_capture_key(Path::new(&path))?;
     let response = tauri::async_runtime::spawn_blocking(move || {
         let capture = PathBuf::from(&path);
         let consume_capture = generated_live_capture_path(&capture)?;
@@ -3825,6 +3864,19 @@ async fn try_experimental_cnn(
     .await
     .map_err(|error| error.to_string())??;
 
+    record_generated_live_forecast_diagnostics(live_segment_key.as_deref(), &response, &alerts);
+    Ok(response)
+}
+
+fn record_generated_live_forecast_diagnostics(
+    live_segment_key: Option<&str>,
+    response: &serde_json::Value,
+    alerts: &Mutex<AlertManager>,
+) {
+    // Offline forecasts must not alter either visible alerts or live baselines.
+    if live_segment_key.is_none() {
+        return;
+    }
     if let Ok(mut alert_mgr) = alerts.lock()
         && let Some(models) = response.get("models").and_then(|m| m.as_object())
     {
@@ -3843,8 +3895,6 @@ async fn try_experimental_cnn(
             }
         }
     }
-
-    Ok(response)
 }
 
 fn operator_forecast_diagnostic_allowed(name: &str, model_info: &serde_json::Value) -> bool {
@@ -4208,29 +4258,43 @@ fn capture_and_replay() -> Result<RunView, String> {
 }
 
 fn replay_path(path: &Path) -> Result<RunView, String> {
-    let limits = PcapLimits {
-        max_file_bytes: NonZeroUsize::new(512 * 1024 * 1024).expect("non-zero literal"),
-        max_records: NonZeroUsize::new(5_000_000).expect("non-zero literal"),
-    };
-    let mut source =
-        PcapReplaySource::from_path(path, limits).map_err(|error| error.to_string())?;
+    replay_path_with_policy(path, false)
+}
+
+fn replay_policy(is_live: bool, load_live: impl FnOnce() -> BlacklistManager) -> BlacklistManager {
+    if is_live {
+        load_live()
+    } else {
+        BlacklistManager::default()
+    }
+}
+
+fn replay_path_with_policy(path: &Path, is_live: bool) -> Result<RunView, String> {
+    let limits = default_pcap_limits();
+    let bytes = replay_import::read_capture(path, limits.max_file_bytes.get())?;
+    let source_id = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("pcap-replay");
+    let mut source = PcapReplaySource::from_bytes(source_id, &bytes, limits)
+        .map_err(|error| error.to_string())?;
     let report = Pipeline::new(PipelineConfig::default())
         .run(&mut source as &mut dyn CaptureSource)
         .map_err(|error| error.to_string())?;
-    Ok(run_view(report))
+    let policy = replay_policy(is_live, BlacklistManager::load);
+    Ok(run_view(report, &policy))
 }
 
-fn run_view(report: RunReport) -> RunView {
+fn run_view(report: RunReport, blacklist: &BlacklistManager) -> RunView {
     let provenance = report.detector.provenance;
     let source = report.source.source_id;
     let session = report.session.session_id;
-    let blacklist = BlacklistManager::load();
     let mut flows: Vec<FlowView> = report
         .flows
         .iter()
-        .map(|summary| flow_view(summary, &session, &source, &blacklist))
+        .map(|summary| flow_view(summary, &session, &source, blacklist))
         .collect();
-    apply_attack_detection(&mut flows, &blacklist);
+    apply_attack_detection(&mut flows, blacklist);
     RunView {
         source: source.clone(),
         session: session.clone(),
@@ -4249,6 +4313,7 @@ fn run_view(report: RunReport) -> RunView {
             processed_packets: report.health.processed_packets,
             flows: report.health.flows,
             alerts: report.health.alerts,
+            non_ip_records: report.health.non_ip_records,
             unsupported_records: report.health.unsupported_records,
             malformed_records: report.health.malformed_records,
             reported_lost_packets: report.health.reported_lost_packets,
@@ -4670,6 +4735,26 @@ fn application_root_from_executable(executable: &Path) -> PathBuf {
     directory.to_path_buf()
 }
 
+#[cfg(test)]
+fn development_root() -> Result<PathBuf, String> {
+    // Unit tests must never overwrite installed operator state, even when the
+    // launching shell carries ARGUS_DEV_ROOT from a development app session.
+    static ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    let root = ROOT.get_or_init(|| {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "argus-desktop-tests-{}-{nonce}",
+            std::process::id()
+        ))
+    });
+    fs::create_dir_all(root).map_err(|error| error.to_string())?;
+    dunce::canonicalize(root).map_err(|error| error.to_string())
+}
+
+#[cfg(not(test))]
 fn development_root() -> Result<PathBuf, String> {
     let root = if let Some(configured) = std::env::var_os("ARGUS_DEV_ROOT") {
         let configured = PathBuf::from(configured);
@@ -4687,6 +4772,14 @@ fn development_root() -> Result<PathBuf, String> {
     dunce::canonicalize(&root).map_err(|error| error.to_string())
 }
 
+#[cfg(test)]
+fn capture_directory() -> Result<PathBuf, String> {
+    let captures = development_root()?.join("captures");
+    fs::create_dir_all(&captures).map_err(|error| error.to_string())?;
+    dunce::canonicalize(captures).map_err(|error| error.to_string())
+}
+
+#[cfg(not(test))]
 fn capture_directory() -> Result<PathBuf, String> {
     let captures = if let Some(configured) = std::env::var_os("ARGUS_CAPTURE_ROOT") {
         let configured = PathBuf::from(configured);
@@ -6111,6 +6204,7 @@ fn main() {
             desktop_status,
             runtime_diagnostics,
             recent_captures,
+            choose_replay_capture,
             replay_capture,
             live_history,
             daily_learning_status,
@@ -6182,6 +6276,142 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_storage_roots_are_process_local_and_never_use_operator_state() {
+        let root = super::development_root().expect("isolated test root");
+        assert!(root.starts_with(std::env::temp_dir()));
+        assert!(
+            root.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("argus-desktop-tests-")
+        );
+        assert_eq!(root, super::development_root().unwrap());
+        assert!(super::capture_directory().unwrap().starts_with(&root));
+        assert!(
+            super::active_defense_store_path()
+                .unwrap()
+                .starts_with(&root)
+        );
+        assert!(super::live_history_path().unwrap().starts_with(&root));
+        assert!(
+            super::daily_learning_directory()
+                .unwrap()
+                .starts_with(&root)
+        );
+        assert!(super::reports_directory().unwrap().starts_with(root));
+    }
+
+    #[test]
+    fn offline_policy_ignores_populated_live_allowlist() {
+        let live_policy = || super::BlacklistManager {
+            rules: vec![super::BlockRuleDto {
+                id: "test-only-allow".to_owned(),
+                target: "0.0.0.0/0".to_owned(),
+                reason: "test fixture".to_owned(),
+                severity: "Manual".to_owned(),
+                created_at_sec: 0,
+                created_at_formatted: String::new(),
+                dropped_packets: 0,
+                dropped_bytes: 0,
+                active: true,
+                os_firewall_rule: false,
+                action: super::TrafficRuleAction::Allow,
+            }],
+            ..super::BlacklistManager::default()
+        };
+        assert!(super::replay_policy(true, live_policy).is_allowlisted("192.0.2.1"));
+        assert!(!super::replay_policy(false, live_policy).is_allowlisted("192.0.2.1"));
+        let mut live_flow = history_run("policy-fixture", 1).flows.remove(0);
+        live_flow.tcp_syn_fin_packets = 1;
+        let mut offline_flow = live_flow.clone();
+        super::apply_attack_detection(
+            std::slice::from_mut(&mut live_flow),
+            &super::replay_policy(true, live_policy),
+        );
+        super::apply_attack_detection(
+            std::slice::from_mut(&mut offline_flow),
+            &super::replay_policy(false, live_policy),
+        );
+        assert!(live_flow.attack_verdict.is_none());
+        assert_eq!(offline_flow.attack_verdict.unwrap().category, "tcp_evasion");
+        let _ = super::replay_policy(false, || {
+            panic!("offline must not read live policy storage")
+        });
+    }
+
+    #[test]
+    fn offline_import_replays_are_isolated_and_preserve_source_bytes() {
+        let directory =
+            std::env::temp_dir().join(format!("argus-offline-import-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).expect("create fixture directory");
+        let capture = directory.join("user-import.pcap");
+        let bytes = argus_capture::generate_simulation_pcap("nominal_baseline_traffic", 20)
+            .expect("generate offline fixture");
+        std::fs::write(&capture, &bytes).expect("write fixture");
+        let first = super::replay_path(&capture).expect("first offline replay");
+        let second = super::replay_path(&capture).expect("second offline replay");
+        assert_ne!(first.session, second.session);
+        assert_eq!(first.health.processed_packets, 20);
+        assert_eq!(second.health.processed_packets, 20);
+        assert_eq!(first.flows.len(), second.flows.len());
+        assert!(first.flows.iter().all(|flow| flow.attack_verdict.is_none()));
+        assert!(
+            second
+                .flows
+                .iter()
+                .all(|flow| flow.attack_verdict.is_none())
+        );
+        assert_eq!(std::fs::read(&capture).expect("source remains"), bytes);
+        // Wrap a generated Ethernet frame in a minimal little-endian PCAPNG.
+        let packet_len = u32::from_le_bytes(bytes[32..36].try_into().unwrap());
+        let packet = &bytes[40..40 + usize::try_from(packet_len).unwrap()];
+        let padded_len = (packet_len + 3) & !3;
+        let mut pcapng = Vec::new();
+        for word in [
+            0x0a0d_0d0a_u32,
+            28,
+            0x1a2b_3c4d,
+            1,
+            u32::MAX,
+            u32::MAX,
+            28,
+            1,
+            20,
+            1,
+            65_535,
+            20,
+            6,
+            32 + padded_len,
+            0,
+            0,
+            1_000_000,
+            packet_len,
+            packet_len,
+        ] {
+            pcapng.extend_from_slice(&word.to_le_bytes());
+        }
+        pcapng.extend_from_slice(packet);
+        pcapng.resize(
+            pcapng.len() + usize::try_from(padded_len - packet_len).unwrap(),
+            0,
+        );
+        pcapng.extend_from_slice(&(32 + padded_len).to_le_bytes());
+        let ng_capture = directory.join("user-import.pcapng");
+        std::fs::write(&ng_capture, &pcapng).expect("write pcapng fixture");
+        let ng_run = super::replay_path(&ng_capture).expect("offline pcapng replay");
+        assert_eq!(ng_run.health.processed_packets, 1);
+        assert_eq!(std::fs::read(&ng_capture).unwrap(), pcapng);
+        let malformed = directory.join("malformed.pcapng");
+        std::fs::write(&malformed, b"not a capture").expect("write malformed fixture");
+        assert!(super::replay_path(&malformed).is_err());
+        assert_eq!(std::fs::read(&malformed).unwrap(), b"not a capture");
+        std::fs::remove_file(capture).expect("remove fixture");
+        std::fs::remove_file(ng_capture).expect("remove pcapng fixture");
+        std::fs::remove_file(malformed).expect("remove malformed fixture");
+        std::fs::remove_dir(directory).expect("remove fixture directory");
+    }
+
     #[test]
     fn packaged_resource_root_stays_beside_relocated_executable() {
         let directory = std::env::temp_dir().join("argus-public-relocation-test");
@@ -6261,6 +6491,83 @@ mod tests {
             "ahem_v61",
             &serde_json::json!({"state":"error"})
         ));
+    }
+
+    #[test]
+    fn generated_live_forecasts_still_publish_diagnostics_and_exclude_shadows() {
+        let alerts = std::sync::Mutex::new(AlertManager::default());
+        for index in 0..20 {
+            let response = serde_json::json!({"models": {
+                "ahem_v61": {"state": "forecast_only", "forecast_error": if index % 2 == 0 {0.01} else {0.02}},
+                "ahem_v63_experimental": {"state": "forecast_only", "forecast_error": 10.0},
+                "disabled": {"state": "disabled", "forecast_error": 10.0}
+            }});
+            super::record_generated_live_forecast_diagnostics(
+                Some("live-segment"),
+                &response,
+                &alerts,
+            );
+        }
+        let response = serde_json::json!({"models": {
+            "ahem_v61": {"state": "forecast_only", "forecast_error": 100.0}
+        }});
+        super::record_generated_live_forecast_diagnostics(Some("live-segment"), &response, &alerts);
+        let manager = alerts.lock().expect("alerts");
+        assert_eq!(manager.forecast_trackers.len(), 1);
+        assert!(manager.forecast_trackers.contains_key("ahem_v61"));
+        assert_eq!(manager.stats().diagnostic_events, 1);
+        assert_eq!(manager.stats().rule_matches, 0);
+        assert_eq!(manager.alerts[0].category, "forecast_residual");
+    }
+
+    #[test]
+    fn offline_forecasts_preserve_live_alerts_and_baselines() {
+        let alerts = std::sync::Mutex::new(AlertManager::default());
+        for index in 0..20 {
+            let response = serde_json::json!({"models": {
+                "ahem_v61": {"state": "forecast_only", "forecast_error": if index % 2 == 0 {0.01} else {0.02}}
+            }});
+            super::record_generated_live_forecast_diagnostics(
+                Some("live-segment"),
+                &response,
+                &alerts,
+            );
+        }
+        let response = serde_json::json!({"models": {
+            "ahem_v61": {"state": "forecast_only", "forecast_error": 100.0}
+        }});
+        super::record_generated_live_forecast_diagnostics(Some("live-segment"), &response, &alerts);
+        let (before_alerts, before_baseline) = {
+            let manager = alerts.lock().expect("alerts");
+            assert_eq!(manager.stats().total_alerts, 1);
+            (
+                serde_json::to_value(manager.get_alerts(None, None))
+                    .expect("serialize live alerts"),
+                format!("{:?}", manager.forecast_trackers["ahem_v61"]),
+            )
+        };
+        let offline = serde_json::json!({"models": {
+            "ahem_v61": {"state": "forecast_only", "forecast_error": 1000.0},
+            "offline_only": {"state": "forecast_only", "forecast_error": 1000.0}
+        }});
+        for _ in 0..20 {
+            super::record_generated_live_forecast_diagnostics(None, &offline, &alerts);
+        }
+        let manager = alerts.lock().expect("alerts");
+        assert_eq!(
+            manager.forecast_trackers.len(),
+            1,
+            "offline model must not create a live baseline"
+        );
+        assert_eq!(
+            format!("{:?}", manager.forecast_trackers["ahem_v61"]),
+            before_baseline
+        );
+        assert_eq!(
+            serde_json::to_value(manager.get_alerts(None, None)).expect("serialize live alerts"),
+            before_alerts
+        );
+        assert_eq!(manager.total_critical, 1);
     }
 
     #[test]
@@ -6344,6 +6651,7 @@ mod tests {
                 processed_packets: u64::try_from(flow_count).expect("test packet count"),
                 flows: flow_count,
                 alerts: 0,
+                non_ip_records: 0,
                 unsupported_records: 0,
                 malformed_records: 0,
                 reported_lost_packets: 0,
@@ -6857,6 +7165,58 @@ mod tests {
     }
 
     #[test]
+    fn saved_replay_does_not_publish_or_replace_live_alerts() {
+        let alerts = std::sync::Mutex::new(AlertManager::default());
+        let mut live = history_run("live-alert-session", 1);
+        live.flows[0].tcp_syn_fin_packets = 1;
+        super::apply_attack_detection(&mut live.flows, &super::BlacklistManager::default());
+        super::record_generated_live_replay_alerts(Some("live-segment"), &live, &alerts);
+        let before = serde_json::to_value(alerts.lock().expect("alerts").get_alerts(None, None))
+            .expect("serialize existing alerts");
+        assert_eq!(before.as_array().expect("alert array").len(), 1);
+
+        let mut saved = history_run("imported-alert-session", 1);
+        saved.flows[0].tcp_syn_fin_packets = 1;
+        saved.flows[0].truncated_packets = 1;
+        super::apply_attack_detection(&mut saved.flows, &super::BlacklistManager::default());
+        let run_before = serde_json::to_value(&saved).expect("serialize replay evidence");
+        super::record_generated_live_replay_alerts(None, &saved, &alerts);
+
+        let manager = alerts.lock().expect("alerts");
+        assert_eq!(
+            serde_json::to_value(manager.get_alerts(None, None)).expect("serialize alerts"),
+            before,
+            "offline rule matches and quality events must not alter the live alert list"
+        );
+        assert_eq!(manager.stats().rule_matches, 1);
+        assert_eq!(manager.stats().diagnostic_events, 0);
+        assert_eq!(manager.total_critical, 1);
+        assert_eq!(manager.total_suspicious, 0);
+        assert_eq!(
+            serde_json::to_value(&saved).expect("replay evidence"),
+            run_before
+        );
+        assert!(saved.flows[0].attack_verdict.is_some());
+    }
+
+    #[test]
+    fn generated_live_replay_still_publishes_rule_and_quality_alerts() {
+        let alerts = std::sync::Mutex::new(AlertManager::default());
+        let mut run = history_run("live-alert-quality-session", 1);
+        run.flows[0].tcp_syn_fin_packets = 1;
+        run.flows[0].truncated_packets = 1;
+        super::apply_attack_detection(&mut run.flows, &super::BlacklistManager::default());
+        super::record_generated_live_replay_alerts(Some("live-segment"), &run, &alerts);
+
+        let manager = alerts.lock().expect("alerts");
+        assert_eq!(manager.stats().total_alerts, 2);
+        assert_eq!(manager.stats().rule_matches, 1);
+        assert_eq!(manager.stats().diagnostic_events, 1);
+        assert_eq!(manager.total_critical, 1);
+        assert_eq!(manager.total_suspicious, 1);
+    }
+
+    #[test]
     fn alert_manager_records_bounded_alerts_and_tracks_severities() {
         use argus_detector::{AlertCategory, AnomalyRecord, AnomalySeverity};
         let mut manager = super::AlertManager::default();
@@ -7228,6 +7588,52 @@ mod tests {
             stale.iter().all(|flow| flow.attack_verdict.is_none()),
             "SYN observations older than the 60-second window cannot accumulate"
         );
+    }
+
+    #[test]
+    fn mixed_replay_health_preserves_non_ip_and_unsupported_exclusions() {
+        let nonce = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let capture = std::env::temp_dir().join(format!("argus-mixed-health-{nonce}.pcap"));
+        let mut tcp = vec![0_u8; 54];
+        tcp[12..14].copy_from_slice(&0x0800_u16.to_be_bytes());
+        tcp[14] = 0x45;
+        tcp[16..18].copy_from_slice(&40_u16.to_be_bytes());
+        tcp[23] = 6;
+        tcp[26..30].copy_from_slice(&[192, 0, 2, 1]);
+        tcp[30..34].copy_from_slice(&[198, 51, 100, 2]);
+        tcp[34..36].copy_from_slice(&50_000_u16.to_be_bytes());
+        tcp[36..38].copy_from_slice(&443_u16.to_be_bytes());
+        tcp[46] = 0x50;
+        tcp[47] = 0x18;
+        let mut arp = vec![0_u8; 14];
+        arp[12..14].copy_from_slice(&0x0806_u16.to_be_bytes());
+        let mut fragment = tcp.clone();
+        fragment[20..22].copy_from_slice(&0x2000_u16.to_be_bytes());
+        argus_capture::write_pcap_file(
+            &capture,
+            [
+                (1_000_000_000, tcp.as_slice(), tcp.len()),
+                (2_000_000_000, arp.as_slice(), arp.len()),
+                (3_000_000_000, fragment.as_slice(), fragment.len()),
+            ],
+        )
+        .expect("write mixed fixture");
+        let run = super::replay_path(&capture).expect("replay mixed fixture");
+        fs::remove_file(capture).expect("remove mixed fixture");
+        assert_eq!(run.health.source_records, 3);
+        assert_eq!(run.health.normalized_packets, 1);
+        assert_eq!(run.health.processed_packets, 1);
+        assert_eq!(run.health.non_ip_records, 1);
+        assert_eq!(run.health.unsupported_records, 1);
+        assert_eq!(run.health.reported_lost_packets, 0);
+        assert_eq!(run.health.malformed_records, 0);
+        assert_eq!(run.flows.len(), 1);
+        let serialized = serde_json::to_value(&run).expect("serialize mixed evidence");
+        assert_eq!(serialized["health"]["nonIpRecords"], 1);
+        assert_eq!(serialized["health"]["unsupportedRecords"], 1);
     }
 
     #[test]

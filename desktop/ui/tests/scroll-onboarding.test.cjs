@@ -28,6 +28,9 @@ test('completion marker is written only after successful native setup; failures 
   assert.equal(failure.writes.length,0);assert.equal(failure.calls.includes('closed'),false);
   assert.match(failure.nodes['onboarding-finish-status'].textContent,/permission denied/);
   assert.equal(failure.nodes['onboarding-next'].disabled,false);
+  assert.equal(failure.nodes['onboarding-skip'].disabled,false);
+  assert.equal(failure.nodes['onboarding-keep-monitoring'].disabled,false);
+  assert.equal(failure.state.onboardingSaving,false);
   const success=setup(false);await success.context.completeOnboarding();
   assert.deepEqual(success.calls,['set_keep_monitoring_after_exit','start_rolling_capture','closed']);
   assert.equal(success.writes[0][0],'argus-onboarding-complete');assert.equal(success.state.onboardingDoneThisSession,true);
@@ -51,4 +54,30 @@ test('completed setup bypasses first-run and blocked storage respects session co
   vm.runInContext(extract('onboardingCompleted'),context);assert.equal(context.onboardingCompleted(),true);
   context.localStorage.getItem=()=>{throw Error('blocked');};assert.equal(context.onboardingCompleted(),false);
   context.state.onboardingDoneThisSession=true;assert.equal(context.onboardingCompleted(),true);
+});
+
+test('pending setup is single-flight and cannot be postponed while capture is starting',async()=>{
+  let release;
+  const calls=[],nodes={},state={rolling:false};
+  const context=vm.createContext({state,ONBOARDING_VERSION:'argus-onboarding/v1',$:id=>nodes[id]??(nodes[id]={}),
+    invoke:async name=>{calls.push(name);if(name==='start_rolling_capture')return new Promise(resolve=>{release=resolve;});return {keepMonitoringAfterExit:false};},
+    updateRollingControl(result){state.rolling=result.running;},localStorage:{setItem(){}},notice(){},closeOnboarding(){calls.push('closed');}});
+  vm.runInContext('async '+extract('completeOnboarding'),context);
+  const pending=context.completeOnboarding();
+  await Promise.resolve();
+  assert.equal(state.onboardingSaving,true);
+  assert.equal(nodes['onboarding-skip'].disabled,true);
+  assert.equal(nodes['onboarding-keep-monitoring'].disabled,true);
+  await context.completeOnboarding();
+  assert.deepEqual(calls,['set_keep_monitoring_after_exit','start_rolling_capture']);
+  const skipHandler=source.slice(source.indexOf('$("onboarding-skip")?.addEventListener'),source.indexOf('\n});',source.indexOf('$("onboarding-skip")?.addEventListener'))+4);
+  nodes['onboarding-skip'].addEventListener=(_,handler)=>{nodes['onboarding-skip'].click=handler;};
+  vm.runInContext(skipHandler,context);
+  nodes['onboarding-skip'].click();
+  assert.equal(calls.includes('closed'),false);
+  release({running:true});await pending;
+  assert.equal(state.onboardingSaving,false);
+  assert.equal(nodes['onboarding-skip'].disabled,false);
+  assert.equal(nodes['onboarding-keep-monitoring'].disabled,false);
+  assert.equal(calls.filter(call=>call==='closed').length,1);
 });

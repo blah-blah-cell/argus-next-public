@@ -15,6 +15,12 @@ $outputDirectory = Join-Path $PSScriptRoot "..\..\target\$profile"
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 $output = Join-Path $outputDirectory 'argus-pktmon-stream.exe'
 $object = Join-Path $outputDirectory 'argus-pktmon-stream.obj'
+$testOutput = Join-Path $outputDirectory 'argus-storage-budget-test.exe'
+$testObject = Join-Path $outputDirectory 'argus-storage-budget-test.obj'
 $optimization = if ($Configuration -eq 'Release') { '/O2' } else { '/Od' }
+cl.exe /nologo /std:c++20 /EHsc /W4 /WX $optimization "$PSScriptRoot\storage_budget_test.cpp" "/Fo$testObject" "/Fe$testOutput"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& $testOutput
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 cl.exe /nologo /std:c++20 /EHsc /W4 /WX $optimization /DUNICODE /D_UNICODE "$PSScriptRoot\main.cpp" "/Fo$object" "/Fe$output" /link /SUBSYSTEM:WINDOWS Shell32.lib
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
