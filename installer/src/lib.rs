@@ -5,4 +5,5 @@
 //! tampered download before it writes anything to disk.
 
 pub mod container;
+pub mod ownership;
 pub mod sha256;

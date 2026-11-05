@@ -156,7 +156,12 @@ impl Package {
     ///
     /// Returns an error when the entry cannot be read or is not valid UTF-8.
     pub fn read_text(&mut self, name: &str) -> io::Result<Option<String>> {
-        let Some(entry) = self.entries.iter().find(|entry| entry.path == name).cloned() else {
+        let Some(entry) = self
+            .entries
+            .iter()
+            .find(|entry| entry.path == name)
+            .cloned()
+        else {
             return Ok(None);
         };
         let size = usize::try_from(entry.size)
@@ -219,7 +224,9 @@ pub fn sanitize_relative(path: &str) -> io::Result<PathBuf> {
     }
     let normalized = path.replace('\\', "/");
     if normalized.starts_with('/') || normalized.contains(':') {
-        return Err(invalid(format!("installer payload contains an absolute path: {path}")));
+        return Err(invalid(format!(
+            "installer payload contains an absolute path: {path}"
+        )));
     }
     let mut relative = PathBuf::new();
     for part in normalized.split('/') {
@@ -300,7 +307,11 @@ pub fn build_payload(
         count += 1;
     }
 
-    write_entry(&mut writer, "VERSION.txt", format!("{version}\n").as_bytes())?;
+    write_entry(
+        &mut writer,
+        "VERSION.txt",
+        format!("{version}\n").as_bytes(),
+    )?;
     count += 1;
 
     writer.write_all(&FOOTER_MAGIC)?;

@@ -58,10 +58,10 @@ a research claim that only ever reports wins is not evidence.
 
 ## The artifacts
 
-The two shipped models are inference-only exports: weights, a manifest with
-schema version and per-tensor digests, and no optimizer, epoch, or RNG state. The
-app verifies the digests before loading and refuses an artifact that does not
-match. Terms are in [models/NOTICE.md](../models/NOTICE.md), and the runtime
+The shipped models are inference exports with manifests and whole-artifact hashes.
+The experimental export excludes optimizer and RNG state; artifacts retain some
+configuration and provenance metadata. The app checks the hashes and model
+contracts before loading. Terms are in [models/NOTICE.md](../models/NOTICE.md), and the runtime
 boundaries are described in [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
 
 ## What is public, and what is not
@@ -72,7 +72,7 @@ architecture decisions, and the limitations above.
 Not published: the raw training captures, copies of the datasets, the full
 training and evaluation harness, internal working notes, and the manuscript while
 it is under review. The reasons are ordinary ones — capture data can identify
-people, dataset terms restrict redistribution, and a paper should describe its
+people, redistribution terms need checking, and a paper should describe its
 methods and limits together rather than in fragments.
 
 If you are reviewing the method and need something that is not here, open an issue

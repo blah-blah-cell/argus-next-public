@@ -10,7 +10,8 @@
 
     Captured data is left alone (uninstall never deletes it), and the desktop app
     is never started, so this is safe to run on a machine that already has Argus
-    installed elsewhere.
+    installed elsewhere. The test refuses to run if an Argus installation or
+    shortcut is already registered, because these are shared per-user resources.
 
 .PARAMETER SetupPath
     Path to ArgusNextPublic-windows-x64-setup.exe.
@@ -29,14 +30,24 @@ $setup = (Resolve-Path -LiteralPath $SetupPath).Path
 if (-not $InstallDirectory) {
     $InstallDirectory = Join-Path ([IO.Path]::GetTempPath()) ("argus-smoke-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 }
+$InstallDirectory = [IO.Path]::GetFullPath($InstallDirectory)
+if (Test-Path -LiteralPath $InstallDirectory) {
+    throw "Install directory already exists; choose a fresh directory: $InstallDirectory"
+}
+$sharedPaths = @(
+    'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ArgusNextPublic',
+    (Join-Path ([Environment]::GetFolderPath('Programs')) 'Argus Next Public.lnk'),
+    (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Argus Next Public.lnk')
+)
+foreach ($sharedPath in $sharedPaths) {
+    if (Test-Path -LiteralPath $sharedPath) {
+        throw "Existing Argus registration or shortcut found; use a clean test account: $sharedPath"
+    }
+}
 
 Write-Host "Verifying payload: $setup"
 & $setup --verify
 if ($LASTEXITCODE -ne 0) { throw "Payload verification failed with exit code $LASTEXITCODE." }
-
-if (Test-Path -LiteralPath $InstallDirectory) {
-    Remove-Item -LiteralPath $InstallDirectory -Recurse -Force
-}
 
 Write-Host "Installing to $InstallDirectory"
 & $setup --silent --install-dir $InstallDirectory

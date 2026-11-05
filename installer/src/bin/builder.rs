@@ -22,8 +22,16 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
-            "--stub" => stub = Some(PathBuf::from(arguments.next().ok_or("--stub needs a path")?)),
-            "--dist" => dist = Some(PathBuf::from(arguments.next().ok_or("--dist needs a path")?)),
+            "--stub" => {
+                stub = Some(PathBuf::from(
+                    arguments.next().ok_or("--stub needs a path")?,
+                ))
+            }
+            "--dist" => {
+                dist = Some(PathBuf::from(
+                    arguments.next().ok_or("--dist needs a path")?,
+                ))
+            }
             "--out" => output = Some(PathBuf::from(arguments.next().ok_or("--out needs a path")?)),
             "--version" => version = Some(arguments.next().ok_or("--version needs a value")?),
             other => return Err(format!("unknown argument: {other}").into()),

@@ -87,8 +87,11 @@ const state = {
 state.flowPagination.pageSize = state.uiPreferences.flowRowLimit || 25;
 const $ = (id) => document.getElementById(id);
 
+let sessionTheme = null;
 function getStoredTheme() {
-  const stored = localStorage.getItem("argus-theme");
+  let stored = sessionTheme;
+  try { stored = localStorage.getItem("argus-theme") || stored; }
+  catch { /* Keep the interface usable when optional storage is blocked. */ }
   if (stored === "light" || stored === "dark") return stored;
   if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
     return "light";
@@ -106,7 +109,9 @@ function setTheme(theme, animate = true) {
     }, 350);
   }
   root.setAttribute("data-theme", theme);
-  localStorage.setItem("argus-theme", theme);
+  sessionTheme = theme;
+  try { localStorage.setItem("argus-theme", theme); }
+  catch { /* Theme selection still applies for this session. */ }
   const toggleBtn = $("theme-toggle");
   if (toggleBtn) {
     const isDark = theme === "dark";
@@ -281,7 +286,13 @@ async function loadOnboardingReadiness() {
 }
 
 async function completeOnboarding() {
+  if (state.onboardingSaving) return;
+  state.onboardingSaving = true;
   const next = $("onboarding-next");
+  const skip = $("onboarding-skip");
+  const keepMonitoringToggle = $("onboarding-keep-monitoring");
+  if (skip) skip.disabled = true;
+  if (keepMonitoringToggle) keepMonitoringToggle.disabled = true;
   const finishStatus = $("onboarding-finish-status");
   if (finishStatus) finishStatus.textContent = "Applying your choices and checking monitoring…";
   if (next) {
@@ -311,6 +322,9 @@ async function completeOnboarding() {
     const summary = $("onboarding-readiness-summary");
     if (summary) summary.textContent = `Setup stopped safely: ${error}`;
   } finally {
+    state.onboardingSaving = false;
+    if (skip) skip.disabled = false;
+    if (keepMonitoringToggle) keepMonitoringToggle.disabled = false;
     if (next) {
       next.disabled = false;
       next.textContent = state.rolling ? "Finish setup and open Argus" : "Start monitoring and open Argus";
@@ -341,7 +355,8 @@ function applyUiPreferences({ persist = true, rerender = true } = {}) {
     state.flowPagination.pageSize = preferences.flowRowLimit;
   }
   if (persist) {
-    localStorage.setItem("argus-ui-preferences", JSON.stringify(preferences));
+    try { localStorage.setItem("argus-ui-preferences", JSON.stringify(preferences)); }
+    catch { /* Preferences remain effective for this session. */ }
   }
   if (rerender && state.flows.length) renderTable(state.flows);
 }
@@ -2803,6 +2818,7 @@ $("onboarding-next")?.addEventListener("click", () => {
 });
 document.querySelectorAll("[data-setup-target]").forEach(button=>button.addEventListener("click",()=>setOnboardingStep(Number(button.dataset.setupTarget))));
 $("onboarding-skip")?.addEventListener("click", () => {
+  if (state.onboardingSaving) return;
   state.userStoppedRolling = true;
   notice("Setup postponed. Return to it from User settings.");
   closeOnboarding();
@@ -2870,7 +2886,10 @@ window.addEventListener("keydown", (e) => {
 });
 if (window.matchMedia) {
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
-    if (!localStorage.getItem("argus-theme")) {
+    let stored = sessionTheme;
+    try { stored = localStorage.getItem("argus-theme") || stored; }
+    catch { /* Session theme remains authoritative if storage is blocked. */ }
+    if (!stored) {
       setTheme(e.matches ? "dark" : "light");
     }
   });

@@ -45,6 +45,19 @@ jobs:
         run: ./scripts/build-windows.ps1
         shell: pwsh
 
+      - name: Optionally sign release binaries
+        if: env.WINDOWS_PFX_BASE64 != ''
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_PFX_BASE64))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw 'signtool.exe not found' }
+          foreach ($file in @('target/release/argus-desktop.exe', 'target/release/argus-nids.exe', 'target/release/argus-pktmon-stream.exe')) {
+            & $signtool.FullName sign /fd SHA256 /f $pfx /p $env:WINDOWS_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $file
+            if ($LASTEXITCODE -ne 0) { throw "Signing failed for $file" }
+          }
+
       - name: Build portable package
         run: ./scripts/package-windows.ps1 -OutputDirectory dist
         shell: pwsh
@@ -57,24 +70,14 @@ jobs:
         run: ./scripts/test-installer.ps1 -SetupPath dist/setup/ArgusNextPublic-windows-x64-setup.exe
         shell: pwsh
 
-      - name: Optional Authenticode signing
+      # The current setup container reads its payload footer from EOF.
+      # Authenticode appends a certificate table, so signing the setup itself
+      # requires certificate-aware parsing and a post-sign install test first.
+      - name: Remove temporary signing key
         if: env.WINDOWS_PFX_BASE64 != ''
         shell: pwsh
         run: |
           $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_PFX_BASE64))
-          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
-          if (-not $signtool) { throw 'signtool.exe not found' }
-          $files = @(
-            'dist/setup/ArgusNextPublic-windows-x64-setup.exe',
-            'dist/ArgusNextPublic-windows-x64/argus-desktop.exe',
-            'dist/ArgusNextPublic-windows-x64/argus-nids.exe',
-            'dist/ArgusNextPublic-windows-x64/argus-pktmon-stream.exe'
-          )
-          foreach ($file in $files) {
-            & $signtool.FullName sign /fd SHA256 /f $pfx /p $env:WINDOWS_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $file
-            if ($LASTEXITCODE -ne 0) { throw "Signing failed for $file" }
-          }
           Remove-Item $pfx -Force
 
       - name: Bundle portable package
@@ -103,7 +106,7 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            dist/ArgusNextPublic-windows-x64-setup.exe
+            dist/setup/ArgusNextPublic-windows-x64-setup.exe
             dist/ArgusNextPublic-windows-x64.zip
 
       - name: Publish release
@@ -114,7 +117,7 @@ jobs:
           $prerelease = '${{ steps.version.outputs.prerelease }}'
           $args = @(
             'release', 'create', '${{ github.ref_name }}',
-            'dist/ArgusNextPublic-windows-x64-setup.exe',
+            'dist/setup/ArgusNextPublic-windows-x64-setup.exe',
             'dist/ArgusNextPublic-windows-x64.zip',
             'dist/SHA256SUMS-RELEASE.txt',
             'dist/sbom/argus-next.cdx.json',

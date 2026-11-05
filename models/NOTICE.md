@@ -6,10 +6,11 @@ to redistribute them is granted by that license.
 
 ## What is shipped
 
-- A validated base ensemble (`argus.ahem-e2e-inference-weights/v1` manifest).
-- A shadow challenger, recorded for comparison only.
-- Sanitized checkpoints: no optimizer state, no learning-rate schedule, no epoch
-  counter, no RNG state, and no dataset identifiers.
+- The frozen AHEM v6.1 forecast model, available as PyTorch and ONNX artifacts.
+- An experimental end-to-end shadow challenger, disabled by default and not
+  eligible to make security decisions.
+- The end-to-end export omits optimizer and RNG state. The artifacts still
+  contain limited provenance and configuration metadata.
 
 ## What they are
 
@@ -26,7 +27,7 @@ before deploying.
 
 ## Provenance
 
-Every artifact carries a manifest with its schema version, parameter count, tensor
-names, and per-tensor digests. The application verifies those digests before
-loading and refuses an artifact that does not match. The source checkpoint and the
-training configuration are not published.
+The application checks whole-artifact hashes and validates the expected model
+schema and tensor state when loading. The manifests do not provide a per-tensor
+digest inventory. Original training checkpoints and raw captures are not included;
+the inference artifacts and manifests retain selected configuration and provenance.

@@ -14,6 +14,10 @@ often it raises false alerts. Please don't rely on it as your only security tool
 
 ## Install on Windows
 
+**Pre-release safety notice:** The published alpha installer and uninstaller are
+under review. Please wait for an updated release before installing or uninstalling.
+The source remains available for technical review.
+
 1. Open the [latest release](https://github.com/blah-blah-cell/argus-next-public/releases)
    and download `ArgusNextPublic-windows-x64-setup.exe`.
 2. Run it. It installs for the current user, so there is no administrator prompt.
@@ -24,7 +28,7 @@ often it raises false alerts. Please don't rely on it as your only security tool
 5. Capture starts stopped. Start monitoring explicitly, and only on networks you
    are authorized to inspect.
 6. To remove it, use **Settings → Apps → Argus Next Public**. Captured data and
-   settings are kept by default and can be deleted during uninstall.
+   settings are retained and must be handled separately.
 
 The setup program verifies every embedded file before writing anything, then adds
 shortcuts and an uninstall entry. It does not install a capture driver, register a
@@ -83,8 +87,11 @@ Before any capture, we'd agree on what traffic can be monitored, who can access 
 data, how long it's kept and how findings are handled. Network metadata can be
 sensitive; only capture traffic you have permission to monitor.
 
-Nothing is sent off the machine. Captures, settings and exported evidence stay on
-local disk, and uninstall keeps them unless you say otherwise.
+Argus processes captured traffic locally. Live monitoring writes temporary PCAP
+segments containing packet bytes, which can include payloads; the separate learning
+journal stores numeric features rather than payloads. Treat captures and exports as
+sensitive. Settings and retained data stay on local disk, and uninstall keeps them
+unless you choose otherwise. Installing dependencies requires internet access.
 
 ## Research
 

@@ -1,6 +1,6 @@
 # 0003 — Metadata-first capture and bounded retention
 
-- Status: Accepted
+- Status: Proposed direction; not fully implemented
 - Date: 2026-11-04
 
 ## Context
@@ -10,7 +10,16 @@ contains personal data by default, and it is the single largest privacy and disk
 risk in the product. The intended users are small organizations without a legal or
 security team to manage that risk.
 
-## Decision
+## Current implementation and intended direction
+
+The current live sensor captures packet bytes into temporary local PCAP
+segments, with a configured 9,000-byte snapshot length. These bytes can include
+payloads. Starting monitoring is the consent action; there is not currently a
+separate payload-retention opt-in or metadata-only capture mode. The derived
+learning journal uses numeric features without payload bytes. The product should
+not be represented as metadata-only capture.
+
+The following are design goals, not completed guarantees:
 
 - The application never starts capturing on its own. Capture is an explicit action
   with a visible state.
@@ -24,7 +33,8 @@ security team to manage that risk.
 
 ## Consequences
 
-- Lower privacy exposure and predictable disk use for the default configuration.
+- The current capture format still exposes packet payloads locally; metadata-only
+  capture and a strict storage budget require further work.
 - Some investigations need payloads; those users must make a deliberate choice and
   accept the storage and privacy cost.
 - Detection and forecasting must remain useful on metadata features, which
