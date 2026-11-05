@@ -6,6 +6,16 @@
 
 #![forbid(unsafe_code)]
 
+fn lower_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut result = String::with_capacity(bytes.len() * 2);
+    for &byte in bytes {
+        result.push(char::from(HEX[usize::from(byte >> 4)]));
+        result.push(char::from(HEX[usize::from(byte & 15)]));
+    }
+    result
+}
+
 use std::{
     fmt,
     fs::File,
@@ -1989,7 +1999,7 @@ fn verify_sha256(path: &Path, expected: &str) -> Result<(), InferenceError> {
         }
         hasher.update(&buffer[..read]);
     }
-    let actual = format!("{:x}", hasher.finalize());
+    let actual = lower_hex(hasher.finalize().as_ref());
     if actual != expected {
         return Err(InferenceError::ArtifactChecksumMismatch);
     }
@@ -2045,6 +2055,15 @@ const fn current_target() -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn sha256_hex_keeps_the_standard_artifact_contract() {
+        use sha2::{Digest, Sha256};
+        assert_eq!(
+            super::lower_hex(Sha256::digest(b"abc").as_ref()),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(super::lower_hex(&[0, 1, 15, 16, 255]), "00010f10ff");
+    }
     use super::*;
     use argus_model_artifact::{
         ARTIFACT_FORMAT, ARTIFACT_FORMAT_VERSION, CalibrationRequirements, Provenance,

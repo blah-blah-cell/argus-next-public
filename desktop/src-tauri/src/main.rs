@@ -4,6 +4,16 @@
 mod query_cache;
 mod replay_import;
 
+fn lower_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut result = String::with_capacity(bytes.len() * 2);
+    for &byte in bytes {
+        result.push(char::from(HEX[usize::from(byte >> 4)]));
+        result.push(char::from(HEX[usize::from(byte & 15)]));
+    }
+    result
+}
+
 use std::{
     cmp::Reverse,
     collections::{HashMap, HashSet, VecDeque},
@@ -2727,7 +2737,7 @@ fn file_sha256(path: &Path) -> Result<String, std::io::Error> {
         }
         digest.update(&buffer[..count]);
     }
-    Ok(format!("{:x}", digest.finalize()))
+    Ok(lower_hex(digest.finalize().as_ref()))
 }
 
 fn external_tool_statuses() -> Vec<ExternalToolStatus> {
@@ -4875,7 +4885,7 @@ fn reports_directory() -> Result<PathBuf, String> {
 fn sha256_bytes(contents: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(contents);
-    format!("{:x}", hasher.finalize())
+    lower_hex(hasher.finalize().as_ref())
 }
 
 fn encode_live_session_export(
@@ -5124,7 +5134,7 @@ async fn export_incident_report(
     md.push_str("## 4. Cryptographic Provenance & Chain of Custody\n\n");
     let mut hasher = Sha256::new();
     hasher.update(md.as_bytes());
-    let report_sha256 = format!("{:x}", hasher.finalize());
+    let report_sha256 = lower_hex(hasher.finalize().as_ref());
     let _ = writeln!(md, "- **Report Content SHA-256:** `{report_sha256}`");
     md.push_str("- **Fail-Closed Verification:** All calculations derived strictly from deterministic live memory with zero mock data.\n");
 
@@ -5631,7 +5641,7 @@ async fn generate_network_dossier(
 
     let mut hasher = Sha256::new();
     hasher.update(html.as_bytes());
-    let sha256_hash = format!("{:x}", hasher.finalize());
+    let sha256_hash = lower_hex(hasher.finalize().as_ref());
 
     fs::write(&report_file, &html).map_err(|e| e.to_string())?;
 
@@ -6069,7 +6079,7 @@ fn ensure_desktop_shortcut() -> Result<(), String> {
         dunce::canonicalize(std::env::current_exe().map_err(|error| error.to_string())?)
             .map_err(|error| error.to_string())?;
     let icon_bytes = include_bytes!("../icons/icon.ico");
-    let icon_hash = format!("{:x}", Sha256::digest(icon_bytes));
+    let icon_hash = lower_hex(Sha256::digest(icon_bytes).as_ref());
     let local_root = std::env::var_os("LOCALAPPDATA")
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
@@ -6277,9 +6287,19 @@ fn main() {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn sha256_format_is_stable_across_digest_dependency_updates() {
+        use sha2::{Digest, Sha256};
+        assert_eq!(
+            super::lower_hex(Sha256::digest(b"abc").as_ref()),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+    #[test]
     fn test_storage_roots_are_process_local_and_never_use_operator_state() {
         let root = super::development_root().expect("isolated test root");
-        assert!(root.starts_with(std::env::temp_dir()));
+        let temporary_root =
+            dunce::canonicalize(std::env::temp_dir()).expect("canonical temporary root");
+        assert!(root.starts_with(temporary_root));
         assert!(
             root.file_name()
                 .unwrap()

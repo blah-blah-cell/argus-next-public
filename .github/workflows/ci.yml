@@ -22,6 +22,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
       - uses: Swatinem/rust-cache@v2
@@ -46,6 +48,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.96.0 --profile minimal
       - uses: Swatinem/rust-cache@v2
@@ -62,6 +66,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -77,6 +83,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Dependency, license, and source policy
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
@@ -93,6 +101,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.96.0 --profile minimal
       - uses: Swatinem/rust-cache@v2
