@@ -19,8 +19,30 @@ at. It is a reason to look, not a verdict.
 
 ## The frozen experiment
 
-In a frozen experiment on a selected subset of CSE-CIC-IDS2018, AHEM v6.1 had
-lower weighted forecasting loss than a similarly sized flow-lane LSTM.
+The original primary evaluation used the Friday, 23 February 2018 capture from
+CSE-CIC-IDS2018. It scored 512 selected next-same-flow prediction points with
+eligible memory, across three model seeds. The targets were packet size and
+per-flow arrival delay; the metric was weighted Smooth L1 forecasting loss.
+
+| Model | Trainable parameters | Mean weighted loss across seeds |
+| --- | ---: | ---: |
+| AHEM v6.1 | 40,851 | 0.248937 |
+| Flow-lane LSTM | 41,142 | 0.435422 |
+
+The recorded equal-seed mean of the per-seed relative loss reductions was
+**42.81%**. This is the mean of three ratios, not necessarily the ratio of the
+rounded losses above. A local result file matches its recorded SHA-256; the run
+was not reproduced for this overview, and an independent audit identified
+remaining work binding the primary result to its complete protocol and model
+provenance. The original evaluation is one test day from one dataset family.
+
+This was **not the only comparison run**. A later supplementary comparison
+gave an LSTM the additional recent-global input and recorded a 40.57% mean
+relative loss reduction for AHEM on the same coordinates. That control was
+added after the test data had first been accessed, so it is secondary evidence,
+not an independent confirmation. Other development experiments were run; some
+variants failed their promotion gates or did not reproduce a gain. This overview
+does not yet provide a complete catalog of all development runs.
 
 Four limits matter when reading that sentence:
 
