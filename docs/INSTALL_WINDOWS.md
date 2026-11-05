@@ -1,6 +1,12 @@
 # Installing Argus Next on Windows
 
-The release page provides a setup program for 64-bit Windows. It installs for the
+**Pre-release safety notice:** Do not use the older `v0.1.0-alpha.1` installer or
+uninstaller. The `v0.1.0-alpha.3` installer passed a fresh install/uninstall smoke
+test on a GitHub Windows runner. It is unsigned, is not an in-place upgrade, and
+has not been validated for deployment on organizational networks.
+
+The [alpha.3 release page](https://github.com/blah-blah-cell/argus-next-public/releases/tag/v0.1.0-alpha.3)
+provides a setup program for 64-bit Windows. It installs for the
 current user, needs no administrator rights, and starts with capture stopped.
 
 ## Requirements
@@ -12,7 +18,9 @@ current user, needs no administrator rights, and starts with capture stopped.
 
 ## Install
 
-1. Download `ArgusNextPublic-windows-x64-setup.exe` from the release page.
+1. Download `ArgusNextPublic-windows-x64-setup.exe` and `SHA256SUMS-RELEASE.txt`
+   from the alpha.3 release page, and compare the setup file's SHA-256 before
+   running it. The older alpha.2 checksum file has a formatting error.
 2. Run it. Windows may warn that the publisher is unknown because the build is
    unsigned; see [Verifying a download](#verifying-a-download) before choosing to
    run it.
@@ -22,8 +30,13 @@ current user, needs no administrator rights, and starts with capture stopped.
    shortcuts, and registers an entry in **Settings → Apps** so it can be removed
    normally.
 
-Setup fails rather than installing partial or altered content: each file is
-hashed before it is written.
+Setup verifies the embedded payload before extraction. An I/O or registration
+failure during installation can still leave a partial installation behind.
+
+The revised installer requires a new, non-existing installation directory and
+will not overwrite an existing installation, shortcut or registration. In-place
+upgrades are not yet supported. An interrupted installation may need manual review
+and cleanup before retrying; do not remove files you do not recognize.
 
 ## First run
 
@@ -50,8 +63,12 @@ ArgusNextPublic-windows-x64-setup.exe --verify           # re-check the embedded
 
 Use **Settings → Apps → Argus Next Public**, or run the installed
 `argus-uninstall.exe --uninstall` (the installer itself is not kept). Uninstall
-removes the program, shortcuts, and the uninstall entry. It asks before deleting captured data and settings, and keeps
-them by default. `--uninstall --silent` keeps data without asking.
+removes verified installer-owned program files, shortcuts and the uninstall entry.
+Captured data, settings, user-added files and nonempty directories are retained.
+Uninstall refuses to proceed if the ownership record is missing, files have changed,
+or the path cannot be verified; older alpha, interrupted or moved installations
+may require manual removal. These checks do not prevent a malicious process running
+as the same user from racing filesystem operations.
 
 ## Verifying a download
 

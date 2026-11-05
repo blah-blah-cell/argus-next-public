@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const main = read('desktop/src-tauri/src/main.rs');
@@ -47,4 +48,24 @@ test('release resource discovery embeds no developer checkout path', () => {
 test('portable packaging retains the embedded Three.js license notice', () => {
   assert.match(read('scripts/package-windows.ps1'), /'desktop\/ui\/vendor\/three\/LICENSE' = 'THIRD_PARTY\/three-LICENSE\.txt'/);
   assert.match(read('desktop/ui/vendor/three/LICENSE'), /The MIT License/);
+});
+
+test('installer smoke test cannot erase an existing install directory', { skip: process.platform !== 'win32' }, () => {
+  const script = path.join(root, 'scripts/test-installer.ps1');
+  // The setup path only needs to exist: the guard must run before executing it.
+  const result = spawnSync('powershell.exe', [
+    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+    '-File', script, '-SetupPath', script, '-InstallDirectory', root,
+  ], { encoding: 'utf8' });
+  assert.equal(result.error, undefined);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Install directory already exists/);
+  assert.doesNotMatch(read('scripts/test-installer.ps1'), /Remove-Item -LiteralPath \$InstallDirectory/);
+});
+
+test('installer smoke test protects shared per-user installation registration', () => {
+  const smoke = read('scripts/test-installer.ps1');
+  assert.match(smoke, /HKCU:.*Uninstall\\ArgusNextPublic/);
+  assert.match(smoke, /use a clean test account/);
+  assert.ok(smoke.indexOf('foreach ($sharedPath') < smoke.indexOf('& $setup --verify'));
 });

@@ -27,6 +27,10 @@ if (-not (Test-Path -LiteralPath (Join-Path $PackageDirectory 'argus-desktop.exe
 if (Test-Path -LiteralPath $OutputPath) {
     throw "Output already exists. Choose a fresh -OutputPath: $OutputPath"
 }
+$OutputDirectory = Split-Path -Parent $OutputPath
+if ($OutputDirectory -and -not (Test-Path -LiteralPath $OutputDirectory)) {
+    New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+}
 
 $InstallerRoot = Join-Path $RepositoryRoot 'installer'
 $Cargo = (Get-Command cargo -ErrorAction Stop).Source

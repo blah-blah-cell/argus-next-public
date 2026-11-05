@@ -14,6 +14,92 @@ function extract(name) {
   return source.slice(start, end < 0 ? source.length : end);
 }
 
+const replayHealth = () => ({sourceRecords:3,normalizedPackets:1,processedPackets:1,flows:1,
+  nonIpRecords:1,unsupportedRecords:1,malformedRecords:0,reportedLostPackets:0,
+  truncatedPackets:0,reorderedPackets:0,queueOverflows:0,parseErrors:0,sourceErrors:0});
+function qualityRenderer(state = {}) {
+  const elements = new Map();
+  const context = vm.createContext({state,formatNumber:String,$(id) {
+    if(!elements.has(id))elements.set(id,{textContent:'',style:{display:'none'}});
+    return elements.get(id);
+  }});
+  vm.runInContext(extract('renderCaptureQuality'),context);
+  return {context,elements};
+}
+
+test('capture quality distinguishes protocol exclusions from loss and empty analysis',()=>{
+  const {context,elements}=qualityRenderer();
+  const health=replayHealth();
+  context.renderCaptureQuality({health});
+  assert.equal(elements.get('metric-quality').textContent,'PARTIAL PROTOCOL COVERAGE');
+  assert.match(elements.get('metric-quality-detail').textContent,/1 non-IP excluded · 1 unsupported/);
+  health.unsupportedRecords=0;
+  context.renderCaptureQuality({health});
+  assert.equal(elements.get('metric-quality').textContent,'NO REPORTED LOSS','non-IP exclusions are not loss');
+  health.normalizedPackets=0;
+  context.renderCaptureQuality({health});
+  assert.equal(elements.get('metric-quality').textContent,'NO ANALYZABLE IP PACKETS');
+  health.unsupportedRecords=3;
+  context.renderCaptureQuality({health});
+  assert.equal(elements.get('metric-quality').textContent,'NO ANALYZABLE IP PACKETS');
+});
+
+test('explicit malformed, queue and source errors cannot produce a no-loss headline',()=>{
+  const {context,elements}=qualityRenderer();
+  for(const key of ['malformedRecords','queueOverflows','sourceErrors','parseErrors']) {
+    context.renderCaptureQuality({health:{...replayHealth(),unsupportedRecords:0,[key]:2}});
+    assert.equal(elements.get('metric-quality').textContent,'2 CAPTURE ISSUES',key);
+  }
+});
+
+test('only rolling runs include separately labeled live sensor totals',()=>{
+  const state={runIsLive:false,runIsSimulation:false,sensorHealth:{missedWrites:2,missedReads:3,applicationDrops:4,malformed:1,retentionEvictions:5}};
+  const {context,elements}=qualityRenderer(state);
+  const run={health:{...replayHealth(),unsupportedRecords:0}};
+  context.renderCaptureQuality(run);
+  assert.equal(elements.get('metric-quality').textContent,'NO REPORTED LOSS');
+  assert.doesNotMatch(elements.get('metric-quality-detail').textContent,/native drops|capture files retired/);
+  state.runIsLive=true;context.renderCaptureQuality(run);
+  assert.equal(elements.get('metric-quality').textContent,'10 CAPTURE ISSUES');
+  assert.match(elements.get('metric-quality-detail').textContent,/live sensor totals: 9 native drops · 1 malformed · 5 capture files retired/);
+  state.runIsSimulation=true;context.renderCaptureQuality(run);
+  assert.equal(elements.get('metric-quality').textContent,'NO REPORTED LOSS');
+  assert.doesNotMatch(elements.get('metric-quality-detail').textContent,/live sensor totals/);
+});
+
+test('rerender preserves rolling origin while saved replay explicitly clears it',()=>{
+  const state={runIsLive:false,runIsSimulation:false};
+  const {context}=qualityRenderer(state);
+  Object.assign(context,{renderBars(){},renderTopology(){},renderTable(){},renderEvidence(){}});
+  vm.runInContext(extract('renderRun'),context);
+  const run={health:{...replayHealth(),unsupportedRecords:0},flows:[]};
+  context.renderRun(run,false,true);assert.equal(state.runIsLive,true);
+  context.renderRun(run);assert.equal(state.runIsLive,true);
+  context.renderRun(run,false,false);assert.equal(state.runIsLive,false);
+  context.renderRun(run,true,true);assert.equal(state.runIsLive,false);
+});
+
+test('replay origin follows the rolling caller and a failure preserves the previous run',async()=>{
+  const calls=[];const state={activeCapturePath:'C:/captures/live/live-1.pcap',runIsLive:true};
+  let fail=false;
+  const context=vm.createContext({state,invoke:async()=>{if(fail)throw Error('parse failed');return {session:'returned'};},
+    renderRun:(...args)=>{calls.push(args);state.runIsLive=args[2];},loadLiveHistory:async()=>{},loadAlerts:async()=>{},setBusy(){},notice(){}});
+  vm.runInContext('async '+extract('replaySelected'),context);
+  assert.equal(await context.replaySelected(true),true);assert.equal(calls[0][2],true);
+  assert.equal(await context.replaySelected(false),true);assert.equal(calls[1][2],false);
+  fail=true;assert.equal(await context.replaySelected(false),false);
+  assert.equal(calls.length,2);assert.equal(state.runIsLive,false);
+});
+
+test('evidence panel exposes the non-IP exclusion count without inferring loss',()=>{
+  const grid={children:[],replaceChildren(){this.children=[];},append(child){this.children.push(child);}};
+  const context=vm.createContext({state:{},formatNumber:String,$:()=>grid,document:{createElement:()=>({children:[],append(...children){this.children.push(...children);}})}});
+  vm.runInContext(extract('renderEvidence'),context);
+  context.renderEvidence({health:replayHealth(),detector:{id:'test',trained:false},session:'fixture',source:'fixture'});
+  const entry=grid.children.find(item=>item.children[0].textContent==='Non-IP records excluded');
+  assert.equal(entry.children[1].textContent,'1');
+});
+
 test('missing and non-finite forecast values stay unavailable', () => {
   const context = vm.createContext({});
   vm.runInContext(extract('formatDuration') + '\n' + extract('formatMetric'), context);

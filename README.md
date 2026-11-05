@@ -12,31 +12,26 @@ It is a prototype, not a security product. A forecast is not an attack verdict, 
 I haven't yet established how well this detects threats in a real network or how
 often it raises false alerts. Please don't rely on it as your only security tool.
 
-## Install on Windows
+## A look at onboarding
 
-1. Open the [latest release](https://github.com/blah-blah-cell/argus-next-public/releases)
-   and download `ArgusNextPublic-windows-x64-setup.exe`.
-2. Run it. It installs for the current user, so there is no administrator prompt.
-3. Windows may warn that the publisher is unknown, because the build is unsigned.
-   Check the SHA-256 from the release notes first — see
-   [Verify your download](#verify-your-download).
-4. Launch **Argus Next Public** from the Start menu or the desktop shortcut.
-5. Capture starts stopped. Start monitoring explicitly, and only on networks you
-   are authorized to inspect.
-6. To remove it, use **Settings → Apps → Argus Next Public**. Captured data and
-   settings are kept by default and can be deleted during uninstall.
+The first-run introduction leads into privacy and device setup. These screenshots
+show the application interface rendered in a browser, without live network data.
 
-The setup program verifies every embedded file before writing anything, then adds
-shortcuts and an uninstall entry. It does not install a capture driver, register a
-scheduled task, request elevation, create firewall rules, or download anything.
-The elevated sensor is registered only when you start live capture.
+![Argus Next onboarding welcome screen with a glass A](docs/images/onboarding-welcome.png)
 
-Model forecasting is optional: the setup program ships the app and its weights, not
-a Python runtime. Without the optional PyTorch runtime the app still runs, captures
-and shows flows; the interface reports model readiness instead of hiding it. See
-the model runtime section of the [Windows build guide](docs/BUILD_WINDOWS.md).
+![Argus Next onboarding privacy and setup screen](docs/images/onboarding-setup.png)
 
-Full detail, requirements and command-line flags: [Windows install guide](docs/INSTALL_WINDOWS.md).
+## Current status
+
+The [Windows alpha.3 prerelease](https://github.com/blah-blah-cell/argus-next-public/releases/tag/v0.1.0-alpha.3)
+has passed a fresh install/uninstall smoke test on a GitHub Windows runner. It is
+unsigned and remains an early prototype; it is not yet ready for an NGO deployment.
+**Do not install or run the uninstaller from the older alpha.1 release.**
+
+The app currently targets Windows. Model forecasting is optional and requires a
+separately configured Python/PyTorch runtime; the packaged weights alone do not
+make forecasting available. See the [Windows build guide](docs/BUILD_WINDOWS.md).
+Live capture is opt-in and may require administrator approval.
 
 ### Requirements
 
@@ -44,30 +39,23 @@ Full detail, requirements and command-line flags: [Windows install guide](docs/I
 - The Microsoft Visual C++ x64 runtime.
 - Pktmon API support for live capture.
 
-### Unattended install
-
-```powershell
-.\ArgusNextPublic-windows-x64-setup.exe --silent
-.\ArgusNextPublic-windows-x64-setup.exe --install-dir D:\Tools\Argus --no-launch
-.\ArgusNextPublic-windows-x64-setup.exe --verify
-```
-
-## Verify your download
-
-Release notes publish the SHA-256 of both artifacts:
-
-```powershell
-Get-FileHash .\ArgusNextPublic-windows-x64-setup.exe -Algorithm SHA256
-```
-
-`--verify` re-hashes every embedded file. That establishes integrity relative to the
-publisher's manifest, which is not the same as publisher identity: the binaries are
-not code-signed yet. Treat an unexpected hash as a reason not to run the file.
+For a supervised evaluation, download the alpha.3 setup from the release page and
+check its hash against `SHA256SUMS-RELEASE.txt`. A matching hash checks the download
+against the published value, not the publisher's identity. Read the
+[installation guide](docs/INSTALL_WINDOWS.md) before proceeding.
 
 ## What it does
 
-The app can capture traffic, show network flows and replay packet captures. It also
-includes models that forecast packet behavior. One of them, Adaptive Hierarchical
+The app can capture traffic and show network flows. The development source now
+includes an **Import capture & replay** control for saved PCAP/PCAPNG files; this
+is not included in the published alpha.3 installer yet. Stop monitoring before
+importing. Offline replay does not start capture, update live alerts or model
+baselines, or enable live blocking actions. It leaves the selected file unchanged
+and shows its own flow evidence and capture-quality counters. Forecast inference
+is not run automatically; model availability is shown separately.
+
+The command-line tools also support replay. The project includes models that forecast packet behavior.
+One of them, Adaptive Hierarchical
 Event Memory (AHEM), is the focus of my research into how a small model can use a
 flow's earlier history.
 
@@ -83,13 +71,36 @@ Before any capture, we'd agree on what traffic can be monitored, who can access 
 data, how long it's kept and how findings are handled. Network metadata can be
 sensitive; only capture traffic you have permission to monitor.
 
-Nothing is sent off the machine. Captures, settings and exported evidence stay on
-local disk, and uninstall keeps them unless you say otherwise.
+Argus processes captured traffic locally. Live monitoring writes temporary PCAP
+segments containing packet bytes, which can include payloads; the separate learning
+journal stores numeric features rather than payloads. Treat captures and exports as
+sensitive. Settings and retained data stay on local disk, and uninstall keeps them
+unless you choose otherwise. Installing dependencies requires internet access.
 
 ## Research
 
-The [research overview](research/README.md) explains what AHEM has been tested on
-and what those tests can — and can't — tell us.
+The question behind Argus is whether a small model can use a flow's own earlier,
+causally observed transitions — only packets that have already arrived, never
+future ones — to forecast that flow's next packet size and arrival delay. AHEM is
+the attempt to answer it with a model small enough to run on an ordinary machine.
+
+In a frozen experiment on a selected subset of CSE-CIC-IDS2018, AHEM v6.1 had
+lower weighted forecasting loss than a similarly sized flow-lane LSTM. That is a
+forecast result on returning flows with eligible history, not a detection result.
+The two models did not receive identical recent global inputs, and the sample did
+not cover every packet or every kind of network, so the comparison isolates the
+effect of memory only partly. It says nothing yet about false-positive rates or
+how the model behaves on a real network. A later, larger experimental model
+remains disabled by default for the same reason.
+
+The [research overview](research/README.md) sets out the method, the caveats, the
+outcomes that did not reproduce, and what is and isn't published. The shipped
+weights are inference-only and hash-verified; their terms are in
+[models/NOTICE.md](models/NOTICE.md).
+
+I would rather publish a small honest result than a large ambiguous one, so
+negative and inconclusive findings are documented next to the positive ones. If
+you are reviewing the method and something is missing, open an issue and ask.
 
 ## Development
 
@@ -99,7 +110,7 @@ Build and test on Windows with Rust, Node 22+, and the Visual C++ build tools:
 .\scripts\build-windows.ps1
 ```
 
-The checks below are what CI enforces:
+Useful checks include:
 
 ```powershell
 cargo fmt --all --check
@@ -108,10 +119,11 @@ cargo test --locked --workspace --all-targets
 cargo test --locked --release --manifest-path installer/Cargo.toml
 node scripts/validate-desktop-ui.cjs
 node --test scripts/test-release-runtime.cjs
+node --test scripts/test-release-workflow.cjs
 node scripts/check-release-metadata.cjs
 ```
 
-`just check` runs the same set if you have [`just`](https://github.com/casey/just).
+See the [CI workflow](.github/workflows/ci.yml) for the complete check set.
 Packaging, installer and release steps are in
 [docs/BUILD_WINDOWS.md](docs/BUILD_WINDOWS.md); the installer can be smoke-tested
 without launching the app with `.\scripts\test-installer.ps1 -SetupPath <setup.exe>`.
