@@ -46,8 +46,16 @@ against the published value, not the publisher's identity. Read the
 
 ## What it does
 
-The app can capture traffic, show network flows and replay packet captures. It also
-includes models that forecast packet behavior. One of them, Adaptive Hierarchical
+The app can capture traffic and show network flows. The development source now
+includes an **Import capture & replay** control for saved PCAP/PCAPNG files; this
+is not included in the published alpha.3 installer yet. Stop monitoring before
+importing. Offline replay does not start capture, update live alerts or model
+baselines, or enable live blocking actions. It leaves the selected file unchanged
+and shows its own flow evidence and capture-quality counters. Forecast inference
+is not run automatically; model availability is shown separately.
+
+The command-line tools also support replay. The project includes models that forecast packet behavior.
+One of them, Adaptive Hierarchical
 Event Memory (AHEM), is the focus of my research into how a small model can use a
 flow's earlier history.
 

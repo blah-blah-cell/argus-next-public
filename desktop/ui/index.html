@@ -205,6 +205,7 @@
             <p class="eyebrow"><span class="eyebrow-live"></span> WINDOWS SENSOR · LOCAL RUNTIME</p>
             <h1 tabindex="-1">Network overview</h1>
             <p class="header-subtitle">Private, real-time traffic intelligence on this device</p>
+            <p id="analysis-source" class="analysis-source">No capture analysis loaded.</p>
           </div>
           <div class="header-actions">
             <div class="capture-state">
@@ -265,6 +266,14 @@
             </button>
           </div>
         </header>
+
+        <section class="offline-replay panel" id="offline-replay" aria-label="Offline capture replay" aria-busy="false">
+          <div>
+            <button class="button" id="import-replay-button" type="button" aria-describedby="import-replay-hint import-replay-status" disabled>Import capture &amp; replay</button>
+            <p id="import-replay-hint">Open a local PCAP or PCAPNG. No live capture, baseline updates, or saved alerts.</p>
+          </div>
+          <p id="import-replay-status" role="status" aria-live="polite" aria-atomic="true">No file imported. Capture files may contain sensitive packet data and stay on this device.</p>
+        </section>
 
         <div class="notice" id="notice" role="status" aria-live="polite" aria-atomic="true">
           <span class="notice-icon">i</span

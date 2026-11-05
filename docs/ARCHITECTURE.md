@@ -58,8 +58,9 @@ untouched by this work and covered by its own validation.
 
 - Install: `%LOCALAPPDATA%\Programs\ArgusNextPublic` (per user, no admin).
 - Data: `%LOCALAPPDATA%\ArgusNextPublic`, retained across uninstall.
-- Settings and capture metadata live beside the data; raw payload retention is an
-  explicit opt-in with bounded defaults (ADR 0003).
+- Settings and capture metadata live beside the data. Temporary live-capture
+  PCAP segments can contain payloads; a separate payload opt-in and fully
+  verified metadata-only mode are not yet implemented (ADR 0003).
 
 ## Trust boundaries
 
@@ -67,8 +68,9 @@ untouched by this work and covered by its own validation.
   boundary are validated; the sidecar must not execute arbitrary paths.
 - **Loopback IPC:** treated as untrusted input even though it is local.
 - **Capture files:** parsed as hostile input; parsers are the primary fuzzing target.
-- **Model artifacts:** manifests are validated and every tensor is hash-checked
-  before use. Weights are data, never code.
+- **Model artifacts:** manifests and whole-artifact hashes are checked against
+  their contracts. The manifests do not provide per-tensor digests; see the
+  model notice for artifact and loading limitations.
 - **Installer payload:** every entry is verified before it is written.
 
 ## Models

@@ -16,6 +16,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include "storage_budget.h"
+
 namespace fs = std::filesystem;
 
 using PacketMonitorHandle = void*;
@@ -93,6 +95,9 @@ struct PcapRecordHeader {
     std::uint32_t original_length;
 };
 #pragma pack(pop)
+
+static_assert(sizeof(PcapHeader) == argus::pcap_file_header_bytes);
+static_assert(sizeof(PcapRecordHeader) == argus::pcap_record_header_bytes);
 
 struct PacketIdentity {
     std::uint64_t group;
@@ -362,6 +367,16 @@ private:
     }
 
     void write_segment(CompletedSegment& segment) {
+        // Best effort: another process may consume space after this check. Fail
+        // before opening any output, rather than pruning data to make room.
+        std::error_code space_error;
+        auto const space = fs::space(directory_, space_error);
+        if (space_error) {
+            throw std::runtime_error("cannot inspect live capture disk space: " + space_error.message());
+        }
+        if (!argus::capture_fits_available_space(space.available, segment.bytes, segment.records.size())) {
+            throw std::runtime_error("live capture would consume the 256 MiB disk-space reserve");
+        }
         std::ranges::stable_sort(segment.records, {}, &BufferedRecord::ticks);
         std::ofstream output(segment.temporary_path, std::ios::binary | std::ios::trunc);
         if (!output) throw std::runtime_error("cannot open live PCAP segment");

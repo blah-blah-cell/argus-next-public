@@ -5,7 +5,8 @@ const path=require('node:path');
 let controller,count,catalog,evidence,mount;
 before(async()=>{({createLabController:controller,packetCount:count,scenarioCatalog:catalog,flowEvidence:evidence,mountSimulationLab:mount}=await import('../simulation-lab.mjs'));});
 const scenarios=[{id:'baseline',title:'Baseline'},{id:'other',title:'Other'}];
-const result=id=>({scenarioId:id,run:{flows:[]},modelResult:{models:{test:{state:'forecast_only'}}}});
+const healthy=()=>({malformedRecords:0,reportedLostPackets:0,truncatedPackets:0,queueOverflows:0,parseErrors:0,sourceErrors:0});
+const result=id=>({scenarioId:id,run:{health:healthy(),flows:[]},modelResult:{models:{test:{state:'forecast_only'}}}});
 test('packet count strictly matches runtime bounds, not silent truncation',()=>{
   for(const value of [10,160,'500'])assert.equal(count(value),Number(value));
   for(const value of [null,'',9,501,10.5,Infinity,'invalid'])assert.throws(()=>count(value),/10 to 500/);
@@ -45,6 +46,33 @@ test('a successful worker response without executed forecasts is not labeled com
   const lab=controller(async id=>({...result(id),modelResult:{models:{short:{state:'insufficient_history'}}}}));
   await lab.start([scenarios[0]],10);assert.equal(lab.snapshot().history[0].status,'partial');
 });
+
+test('explicit replay capture failures remain partial even with executed forecasts',async()=>{
+  for(const key of Object.keys(healthy())) {
+    const fixture=result('baseline');fixture.run.health[key]=1;
+    const lab=controller(async()=>fixture);await lab.start([scenarios[0]],160);
+    const record=lab.snapshot().history[0];
+    assert.equal(record.status,'partial',key);assert.equal(record.result,fixture);
+    assert.deepEqual(record.qualityIssues,[`${key}: 1`]);
+  }
+});
+
+test('missing or invalid capture quality is not treated as verified healthy',async()=>{
+  for(const health of [undefined,{},null,{...healthy(),parseErrors:-1},{...healthy(),sourceErrors:'0'},{...healthy(),queueOverflows:NaN}]) {
+    const fixture=result('baseline');fixture.run.health=health;
+    const lab=controller(async()=>fixture);await lab.start([scenarios[0]],160);
+    assert.equal(lab.snapshot().history[0].status,'partial');
+    assert.match(lab.snapshot().history[0].qualityIssues[0],/unavailable or invalid/);
+  }
+});
+
+test('normal filtering and model warmup counters do not imply capture failure',async()=>{
+  const fixture=result('baseline');
+  Object.assign(fixture.run.health,{unsupportedRecords:2,processedPackets:158,sourceRecords:160,reorderedPackets:1});
+  const lab=controller(async()=>fixture);await lab.start([scenarios[0]],160);
+  assert.equal(lab.snapshot().history[0].status,'complete');
+  assert.deepEqual(lab.snapshot().history[0].qualityIssues,[]);
+});
 test('rule evidence comes from returned verdicts, not scenario labels',()=>{
   const no=evidence({protocol:'TCP',packets:2,initiatorAddress:'a',responderAddress:'b'});
   assert.equal(no.rule,'No deterministic rule match');
@@ -74,7 +102,7 @@ test('mounted lab renders returned evidence and model results without touching a
   const elements=Object.fromEntries(ids.map(id=>[id,new Element()]));
   const root={getElementById:id=>{assert.ok(elements[id],`unexpected access to ${id}`);return elements[id];},createElement:tag=>new Element(tag)};
   let modelsRendered=0;
-  const fixture={...result('baseline'),packetCount:160,flowsCount:1,anomaliesObserved:0,highSeverityAnomalies:0,run:{health:{processedPackets:160},flows:[{protocol:'TCP',packets:160,initiatorAddress:'local',responderAddress:'fixture'}]}};
+  const fixture={...result('baseline'),packetCount:160,flowsCount:1,anomaliesObserved:0,highSeverityAnomalies:0,run:{health:{...healthy(),processedPackets:160,parseErrors:1},flows:[{protocol:'TCP',packets:160,initiatorAddress:'local',responderAddress:'fixture'}]}};
   const lab=mount(root,{list:async()=>scenarios,run:async()=>fixture,renderModels:value=>{assert.equal(value,fixture);modelsRendered++;}});
   await Promise.resolve();await Promise.resolve();
   assert.equal(elements['simulation-cards-container'].children.length,2);assert.equal(elements['sim-run-all-btn'].disabled,false);
@@ -83,4 +111,7 @@ test('mounted lab renders returned evidence and model results without touching a
   assert.equal(elements['sim-stats-row'].children.length,5);assert.equal(elements['sim-stop-btn'].disabled,true);
   assert.match(elements['sim-lab-status'].textContent,/1 \/ 1 finished/);
   assert.match(elements['sim-evidence-summary'].textContent,/No live alerts/);
+  assert.match(elements['sim-evidence-summary'].textContent,/Capture quality incomplete: parseErrors: 1/);
+  assert.match(elements['sim-status-name'].textContent,/partial/);
+  assert.match(elements['sim-lab-status'].textContent,/1 partial \(forecasts or capture quality\)/);
 });
