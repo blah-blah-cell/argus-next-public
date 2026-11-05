@@ -95,9 +95,11 @@ jobs:
             '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $rel
           }
           $lines | Set-Content -LiteralPath dist/SHA256SUMS.txt -Encoding utf8NoBOM
+          $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $setupHash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
           @(
-            (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() + '  ArgusNextPublic-windows-x64.zip',
-            (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant() + '  ArgusNextPublic-windows-x64-setup.exe'
+            "$zipHash  ArgusNextPublic-windows-x64.zip"
+            "$setupHash  ArgusNextPublic-windows-x64-setup.exe"
           ) | Set-Content -LiteralPath dist/SHA256SUMS-RELEASE.txt -Encoding utf8NoBOM
 
       - name: Prepare SBOM output directory
