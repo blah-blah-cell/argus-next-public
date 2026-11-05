@@ -12,6 +12,15 @@ It is a prototype, not a security product. A forecast is not an attack verdict, 
 I haven't yet established how well this detects threats in a real network or how
 often it raises false alerts. Please don't rely on it as your only security tool.
 
+## A look at onboarding
+
+The first-run introduction leads into privacy and device setup. These screenshots
+show the application interface rendered in a browser, without live network data.
+
+![Argus Next onboarding welcome screen with a glass A](docs/images/onboarding-welcome.png)
+
+![Argus Next onboarding privacy and setup screen](docs/images/onboarding-setup.png)
+
 ## Current status
 
 The [Windows alpha.3 prerelease](https://github.com/blah-blah-cell/argus-next-public/releases/tag/v0.1.0-alpha.3)
