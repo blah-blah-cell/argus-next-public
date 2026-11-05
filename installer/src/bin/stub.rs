@@ -5,13 +5,13 @@
 //! altered download fails instead of installing partially.
 
 use argus_setup::container::{sanitize_relative, Package};
+use argus_setup::ownership::{fresh_install_preflight, hash_file, write_record, Removal};
 use std::env;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::thread::sleep;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const APP_EXE: &str = "argus-desktop.exe";
 const APP_NAME: &str = "Argus Next Public";
@@ -47,7 +47,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "--verify" => options.verify_only = true,
             "--install-dir" => {
                 let value = arguments.next().ok_or("--install-dir requires a path")?;
-                options.install_dir = Some(PathBuf::from(value));
+                options.install_dir = Some(std::path::absolute(value)?);
             }
             "--help" | "-h" => {
                 print_help();
@@ -98,6 +98,8 @@ fn install(
         None => default_install_directory()?,
     };
 
+    fresh_install_preflight(&directory, shared_installation_exists()?)?;
+
     println!("{APP_NAME} {version}");
     println!("Install location: {}", directory.display());
     if !options.silent {
@@ -108,14 +110,36 @@ fn install(
         }
     }
 
-    fs::create_dir_all(&directory)?;
+    // Repeat after any prompt; never extract over a pre-existing installation.
+    fresh_install_preflight(&directory, shared_installation_exists()?)?;
+    fs::create_dir_all(
+        directory
+            .parent()
+            .ok_or("install directory has no parent")?,
+    )?;
+    fs::create_dir(&directory)?;
     package.extract(|relative| Ok(directory.join(sanitize_relative(relative)?)))?;
     write_install_record(&directory, version, package)?;
-    create_shortcuts(&directory)?;
     // Copy only the stub, not the 21 MB payload, so the installed uninstaller
     // stays small while still working after the download is deleted.
     let uninstaller = directory.join("argus-uninstall.exe");
     copy_prefix(setup, &uninstaller, package.stub_length())?;
+    let mut owned = package
+        .entries
+        .iter()
+        .map(|entry| (entry.path.clone(), argus_setup::sha256::hex(&entry.hash)))
+        .collect::<Vec<_>>();
+    owned.push((
+        "INSTALL.txt".to_owned(),
+        hash_file(&directory.join("INSTALL.txt"))?,
+    ));
+    write_record(&directory, &owned)?;
+    if shared_installation_exists()? {
+        return Err(
+            "Argus registration appeared during installation; refusing to overwrite it".into(),
+        );
+    }
+    create_shortcuts(&directory)?;
     write_uninstall_entry(&uninstaller, &directory, version)?;
 
     println!("Installed {} files.", package.entries.len());
@@ -133,6 +157,10 @@ fn uninstall(setup: &Path, options: &Options) -> Result<(), Box<dyn std::error::
         Some(path) => path.clone(),
         None => default_install_directory()?,
     };
+
+    // Validate before spawning, prompting, changing registration, or deleting.
+    // Legacy installations without this record require manual removal.
+    let removal = Removal::validate(&directory, setup)?;
 
     // The uninstaller usually lives inside the directory it must delete.
     if !options.from_temp {
@@ -156,19 +184,14 @@ fn uninstall(setup: &Path, options: &Options) -> Result<(), Box<dyn std::error::
         return Err(format!("{APP_NAME} is running. Close it and try again.").into());
     }
 
-    let remove_data =
-        !options.silent && confirm("Also delete captured data and settings? [y/N] ", false);
-    remove_shortcuts()?;
-    remove_uninstall_entry();
-    remove_directory(&directory)?;
+    if !removal.remove()? {
+        println!("Kept user-added files in {}", directory.display());
+    }
+    remove_shortcuts(&directory)?;
+    remove_uninstall_entry(&directory)?;
 
     let data = default_data_directory()?;
-    if remove_data && data.exists() {
-        fs::remove_dir_all(&data)?;
-        println!("Removed data: {}", data.display());
-    } else {
-        println!("Kept data: {}", data.display());
-    }
+    println!("Kept data: {}", data.display());
     println!("{APP_NAME} uninstalled.");
     Ok(())
 }
@@ -196,6 +219,37 @@ fn write_install_record(directory: &Path, version: &str, package: &Package) -> i
 
 fn powershell_quote(path: &Path) -> String {
     path.to_string_lossy().replace('\'', "''")
+}
+
+fn shared_installation_script() -> &'static str {
+    // Read-only, errors fail closed. Use the same Windows known folders as the
+    // shortcut writer, rather than guessing from an unredirected Desktop path.
+    "$ErrorActionPreference='Stop'; \
+        $paths=@('HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ArgusNextPublic'); \
+        foreach ($folder in @('Programs','Desktop')) { \
+            $base=[Environment]::GetFolderPath($folder); \
+            if ($base) { $paths += (Join-Path $base 'Argus Next Public.lnk') } \
+        }; \
+        $found=$false; foreach ($path in $paths) { \
+            if (Test-Path -LiteralPath $path -ErrorAction Stop) { $found=$true } \
+        }; [Console]::Write($found.ToString())"
+}
+
+fn shared_installation_exists() -> io::Result<bool> {
+    let script = shared_installation_script();
+    let output = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", script])
+        .output()?;
+    if !output.status.success() {
+        return Err(io::Error::other("cannot verify shared Argus registration"));
+    }
+    match String::from_utf8_lossy(&output.stdout).trim() {
+        "True" => Ok(true),
+        "False" => Ok(false),
+        _ => Err(io::Error::other(
+            "invalid shared registration probe response",
+        )),
+    }
 }
 
 fn create_shortcuts(directory: &Path) -> io::Result<()> {
@@ -245,32 +299,43 @@ fn create_shortcuts(directory: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn remove_shortcuts() -> io::Result<()> {
-    if let Some(appdata) = env::var_os("APPDATA") {
-        let link = PathBuf::from(appdata)
-            .join(r"Microsoft\Windows\Start Menu\Programs")
-            .join("Argus Next Public.lnk");
-        if link.exists() {
-            fs::remove_file(link)?;
-        }
-    }
-    let script = "$ErrorActionPreference='SilentlyContinue'; \
-                  $desktop=[Environment]::GetFolderPath('Desktop'); \
-                  if ($desktop) { \
-                    $link=Join-Path $desktop 'Argus Next Public.lnk'; \
-                    if (Test-Path -LiteralPath $link) { Remove-Item -LiteralPath $link -Force } \
-                  }";
-    let _ = Command::new("powershell")
+fn shortcut_cleanup_script(directory: &Path) -> String {
+    format!(
+        "$ErrorActionPreference='Stop'; $shell=New-Object -ComObject WScript.Shell; \
+         $expected=[IO.Path]::GetFullPath('{}'); \
+         foreach ($folder in @('Programs','Desktop')) {{ \
+           $base=[Environment]::GetFolderPath($folder); if (!$base) {{ continue }}; \
+           $link=Join-Path $base 'Argus Next Public.lnk'; \
+           if (Test-Path -LiteralPath $link) {{ \
+             $item=Get-Item -LiteralPath $link; \
+             if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {{ continue }}; \
+             $target=$shell.CreateShortcut($link).TargetPath; \
+             if ($target -and ([IO.Path]::GetFullPath($target) -ieq $expected)) {{ \
+               Remove-Item -LiteralPath $link -Force \
+             }} \
+           }} \
+         }}",
+        powershell_quote(&directory.join(APP_EXE))
+    )
+}
+
+fn remove_shortcuts(directory: &Path) -> io::Result<()> {
+    let script = shortcut_cleanup_script(directory);
+    let output = Command::new("powershell")
         .args([
             "-NoProfile",
             "-NonInteractive",
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
-            script,
+            &script,
         ])
-        .output();
-    Ok(())
+        .output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other("could not clean owned shortcuts"))
+    }
 }
 
 fn write_uninstall_entry(uninstaller: &Path, directory: &Path, version: &str) -> io::Result<()> {
@@ -289,18 +354,28 @@ fn write_uninstall_entry(uninstaller: &Path, directory: &Path, version: &str) ->
         ("DisplayIcon", icon.to_string_lossy().to_string(), "REG_SZ"),
         (
             "UninstallString",
-            format!("\"{setup_path}\" --uninstall"),
+            uninstall_command(&setup_path, directory, false),
             "REG_SZ",
         ),
         (
             "QuietUninstallString",
-            format!("\"{setup_path}\" --uninstall --silent"),
+            uninstall_command(&setup_path, directory, true),
             "REG_SZ",
         ),
         ("EstimatedSize", size_kb.to_string(), "REG_DWORD"),
     ];
     for (name, value, kind) in values {
-        reg(&["add", UNINSTALL_KEY, "/f", "/v", name, "/t", kind, "/d", &value])?;
+        reg(&[
+            "add",
+            UNINSTALL_KEY,
+            "/f",
+            "/v",
+            name,
+            "/t",
+            kind,
+            "/d",
+            &value,
+        ])?;
     }
     reg(&[
         "add",
@@ -326,8 +401,48 @@ fn write_uninstall_entry(uninstaller: &Path, directory: &Path, version: &str) ->
     ])
 }
 
-fn remove_uninstall_entry() {
-    let _ = reg(&["delete", UNINSTALL_KEY, "/f"]);
+fn registration_cleanup_script(directory: &Path) -> String {
+    format!(
+        "$ErrorActionPreference='Stop'; \
+         $key='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ArgusNextPublic'; \
+         if (Test-Path -LiteralPath $key) {{ \
+           $current=Get-ItemProperty -LiteralPath $key; \
+           if ($current.InstallLocation -and \
+               ([IO.Path]::GetFullPath($current.InstallLocation) -ieq [IO.Path]::GetFullPath('{}'))) {{ \
+             Remove-Item -LiteralPath $key \
+           }} \
+         }}",
+        powershell_quote(directory)
+    )
+}
+
+fn remove_uninstall_entry(directory: &Path) -> io::Result<()> {
+    let script = registration_cleanup_script(directory);
+    let output = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other(
+            "could not clean owned uninstall registration",
+        ))
+    }
+}
+
+fn uninstall_command(executable: &str, directory: &Path, silent: bool) -> String {
+    // The registry command is launched independently of this process, so it
+    // must carry a custom install location through to the temporary uninstaller.
+    let directory = directory.to_string_lossy();
+    // Windows argument parsing treats a backslash before the closing quote as
+    // an escape. Double only trailing backslashes (including a drive root).
+    let trailing_slashes = directory.chars().rev().take_while(|c| *c == '\\').count();
+    format!(
+        "\"{executable}\" --uninstall --install-dir \"{}{}\"{}",
+        directory,
+        "\\".repeat(trailing_slashes),
+        if silent { " --silent" } else { "" }
+    )
 }
 
 fn reg(arguments: &[&str]) -> io::Result<()> {
@@ -367,27 +482,6 @@ fn directory_size(directory: &Path) -> io::Result<u64> {
     Ok(total)
 }
 
-fn remove_directory(directory: &Path) -> io::Result<()> {
-    if !directory.exists() {
-        return Ok(());
-    }
-    let mut last_error = None;
-    for attempt in 0..20 {
-        match fs::remove_dir_all(directory) {
-            Ok(()) => return Ok(()),
-            Err(error) => {
-                if attempt < 19 {
-                    last_error = Some(error);
-                    sleep(Duration::from_millis(250));
-                } else {
-                    return Err(error);
-                }
-            }
-        }
-    }
-    Err(last_error.unwrap_or_else(|| io::Error::other("could not remove the install directory")))
-}
-
 fn app_running() -> io::Result<bool> {
     let output = Command::new("tasklist")
         .args(["/FI", "IMAGENAME eq argus-desktop.exe", "/NH"])
@@ -419,7 +513,9 @@ fn launch(executable: &Path, directory: &Path) -> io::Result<()> {
 
 fn default_install_directory() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let local = env::var_os("LOCALAPPDATA").ok_or("LOCALAPPDATA is not set")?;
-    Ok(PathBuf::from(local).join("Programs").join("ArgusNextPublic"))
+    Ok(PathBuf::from(local)
+        .join("Programs")
+        .join("ArgusNextPublic"))
 }
 
 fn default_data_directory() -> Result<PathBuf, Box<dyn std::error::Error>> {
@@ -441,4 +537,56 @@ fn print_help() {
            --verify        re-check every embedded file and exit\n\n\
          The setup program is unsigned and installs for the current user only."
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::uninstall_command;
+    use std::path::Path;
+
+    #[test]
+    fn registered_uninstall_preserves_custom_location() {
+        let directory = Path::new(r"C:\Custom Apps\Argus");
+        let executable = r"C:\Custom Apps\Argus\argus-uninstall.exe";
+        assert_eq!(
+            uninstall_command(executable, directory, false),
+            r#""C:\Custom Apps\Argus\argus-uninstall.exe" --uninstall --install-dir "C:\Custom Apps\Argus""#
+        );
+        assert!(uninstall_command(executable, directory, true).ends_with(" --silent"));
+        assert!(uninstall_command(executable, Path::new("C:\\"), false)
+            .ends_with("--install-dir \"C:\\\\\""));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn generated_maintenance_scripts_parse_without_execution() {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let directory = Path::new(r"C:\Custom Apps\Kid's Argus");
+        for script in [
+            super::shared_installation_script().to_owned(),
+            super::shortcut_cleanup_script(directory),
+            super::registration_cleanup_script(directory),
+        ] {
+            // ParseInput is syntax-only: do not invoke/evaluate these scripts,
+            // inspect account registration, create COM objects, or delete links.
+            let mut child = Command::new("powershell.exe")
+                .args(["-NoProfile", "-NonInteractive", "-Command",
+                    "$source=[Console]::In.ReadToEnd(); $tokens=$null; $errors=$null; [Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors) | Out-Null; if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }"])
+                .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
+                .spawn().unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(script.as_bytes())
+                .unwrap();
+            let output = child.wait_with_output().unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
 }

@@ -1,5 +1,8 @@
 # Installing Argus Next on Windows
 
+**Pre-release safety notice:** The currently published alpha installer and
+uninstaller are under review. Please wait for a fixed release before using them.
+
 The release page provides a setup program for 64-bit Windows. It installs for the
 current user, needs no administrator rights, and starts with capture stopped.
 
@@ -22,8 +25,13 @@ current user, needs no administrator rights, and starts with capture stopped.
    shortcuts, and registers an entry in **Settings → Apps** so it can be removed
    normally.
 
-Setup fails rather than installing partial or altered content: each file is
-hashed before it is written.
+Setup verifies the embedded payload before extraction. An I/O or registration
+failure during installation can still leave a partial installation behind.
+
+The revised installer requires a new, non-existing installation directory and
+will not overwrite an existing installation, shortcut or registration. In-place
+upgrades are not yet supported. An interrupted installation may need manual review
+and cleanup before retrying; do not remove files you do not recognize.
 
 ## First run
 
@@ -50,8 +58,12 @@ ArgusNextPublic-windows-x64-setup.exe --verify           # re-check the embedded
 
 Use **Settings → Apps → Argus Next Public**, or run the installed
 `argus-uninstall.exe --uninstall` (the installer itself is not kept). Uninstall
-removes the program, shortcuts, and the uninstall entry. It asks before deleting captured data and settings, and keeps
-them by default. `--uninstall --silent` keeps data without asking.
+removes verified installer-owned program files, shortcuts and the uninstall entry.
+Captured data, settings, user-added files and nonempty directories are retained.
+Uninstall refuses to proceed if the ownership record is missing, files have changed,
+or the path cannot be verified; older alpha, interrupted or moved installations
+may require manual removal. These checks do not prevent a malicious process running
+as the same user from racing filesystem operations.
 
 ## Verifying a download
 
