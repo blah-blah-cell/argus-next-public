@@ -30,3 +30,9 @@ test('distribution includes model terms and does not claim payload opt-in', () =
   assert.match(pack, /'NOTICE'\s*=\s*'NOTICE'/);
   assert.match(privacy, /not currently a\s+separate payload-retention opt-in/);
 });
+
+test('manual validation cannot publish a release', () => {
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /name: Upload validation artifacts\s+if: github\.event_name == 'workflow_dispatch'/);
+  assert.match(workflow, /name: Publish release\s+if: github\.event_name == 'push'/);
+});
