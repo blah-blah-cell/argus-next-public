@@ -14,10 +14,10 @@ often it raises false alerts. Please don't rely on it as your only security tool
 
 ## Current status
 
-**Please do not install or run the uninstaller from the published alpha.** Its
-installation and removal behavior needs further verification. Fixes are in the
-source, but have not yet been validated as a replacement release. The repository
-is available for code review; it is not yet ready for an NGO deployment.
+The [Windows alpha.2 prerelease](https://github.com/blah-blah-cell/argus-next-public/releases/tag/v0.1.0-alpha.2)
+has passed a fresh install/uninstall smoke test on a GitHub Windows runner. It is
+unsigned and remains an early prototype; it is not yet ready for an NGO deployment.
+**Do not install or run the uninstaller from the older alpha.1 release.**
 
 The app currently targets Windows. Model forecasting is optional and requires a
 separately configured Python/PyTorch runtime; the packaged weights alone do not
@@ -30,8 +30,11 @@ Live capture is opt-in and may require administrator approval.
 - The Microsoft Visual C++ x64 runtime.
 - Pktmon API support for live capture.
 
-The [installation guide](docs/INSTALL_WINDOWS.md) documents intended behavior and
-its limitations; it is not a recommendation to run the current alpha installer.
+For a supervised evaluation, download the alpha.2 setup from the release page and
+check its hash against the value in the release notes. Its checksum file has a
+formatting error; a matching hash checks the download against the published value,
+not the publisher's identity. Read the
+[installation guide](docs/INSTALL_WINDOWS.md) before proceeding.
 
 ## What it does
 

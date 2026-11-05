@@ -40,3 +40,7 @@ test('manual validation cannot publish a release', () => {
 test('SBOM destination exists before the scanner writes to it', () => {
   assert.match(workflow, /name: Prepare SBOM output directory[\s\S]*New-Item -ItemType Directory -Force -Path dist\/sbom[\s\S]*name: Software bill of materials/);
 });
+
+test('release checksum entries are separate PowerShell array elements', () => {
+  assert.match(workflow, /"\$zipHash  ArgusNextPublic-windows-x64\.zip"\s*\r?\n\s*"\$setupHash  ArgusNextPublic-windows-x64-setup\.exe"/);
+});
