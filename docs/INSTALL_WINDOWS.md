@@ -1,11 +1,11 @@
 # Installing Argus Next on Windows
 
 **Pre-release safety notice:** Do not use the older `v0.1.0-alpha.1` installer or
-uninstaller. The `v0.1.0-alpha.2` installer passed a fresh install/uninstall smoke
+uninstaller. The `v0.1.0-alpha.3` installer passed a fresh install/uninstall smoke
 test on a GitHub Windows runner. It is unsigned, is not an in-place upgrade, and
 has not been validated for deployment on organizational networks.
 
-The [alpha.2 release page](https://github.com/blah-blah-cell/argus-next-public/releases/tag/v0.1.0-alpha.2)
+The [alpha.3 release page](https://github.com/blah-blah-cell/argus-next-public/releases/tag/v0.1.0-alpha.3)
 provides a setup program for 64-bit Windows. It installs for the
 current user, needs no administrator rights, and starts with capture stopped.
 
@@ -18,9 +18,9 @@ current user, needs no administrator rights, and starts with capture stopped.
 
 ## Install
 
-1. Download `ArgusNextPublic-windows-x64-setup.exe` from the alpha.2 release page
-   and compare its SHA-256 against the release notes before running it. The alpha.2
-   checksum file has a formatting error.
+1. Download `ArgusNextPublic-windows-x64-setup.exe` and `SHA256SUMS-RELEASE.txt`
+   from the alpha.3 release page, and compare the setup file's SHA-256 before
+   running it. The older alpha.2 checksum file has a formatting error.
 2. Run it. Windows may warn that the publisher is unknown because the build is
    unsigned; see [Verifying a download](#verifying-a-download) before choosing to
    run it.
