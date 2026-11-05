@@ -10,7 +10,7 @@ rust-version.workspace = true
 argus-features = { path = "../argus-features" }
 argus-model-artifact = { path = "../argus-model-artifact" }
 argus-moe = { path = "../argus-moe" }
-ort = { version = "2.0.0-rc.13", default-features = false, features = ["api-27", "load-dynamic", "std"] }
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["api-27", "load-dynamic", "std"] }
 sha2 = "0.10.9"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.145"

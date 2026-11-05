@@ -27,6 +27,33 @@ use ort::{
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
+fn runtime_environment(
+    runtime_library: &Path,
+    name: &str,
+) -> Result<ort::environment::Environment, InferenceError> {
+    static ENVIRONMENT: Mutex<Option<(PathBuf, ort::environment::Environment)>> = Mutex::new(None);
+    let path = std::fs::canonicalize(runtime_library)
+        .map_err(|error| InferenceError::RuntimeLoad(error.to_string()))?;
+    let mut current = ENVIRONMENT
+        .lock()
+        .map_err(|_| InferenceError::RuntimeLoad("environment lock poisoned".into()))?;
+    if let Some((loaded, environment)) = current.as_ref() {
+        if loaded != &path {
+            return Err(InferenceError::RuntimeLoad(
+                "a different ONNX Runtime library is already loaded".into(),
+            ));
+        }
+        return Ok(environment.clone());
+    }
+    let environment = ort::init_from(&path)
+        .map_err(|error| InferenceError::RuntimeLoad(error.to_string()))?
+        .with_name(name)
+        .build()
+        .map_err(|error| InferenceError::RuntimeLoad(error.to_string()))?;
+    *current = Some((path, environment.clone()));
+    Ok(environment)
+}
+
 pub const RUNTIME_ID: &str = "onnxruntime";
 pub const RUNTIME_PATH_ENVIRONMENT: &str = "ARGUS_ONNX_RUNTIME";
 pub const CPU_THREADS_ENVIRONMENT: &str = "ARGUS_ONNX_CPU_THREADS";
@@ -726,11 +753,8 @@ impl OnnxAhemV34Forecaster {
         contract.validate()?;
         verify_sha256(model_path, &manifest.artifact_sha256)?;
 
-        ort::init_from(runtime_library)
-            .map_err(|error| InferenceError::RuntimeLoad(error.to_string()))?
-            .with_name("argus-ahem-v34-inference")
-            .commit();
-        let session = build_tuned_session(model_path)
+        let environment = runtime_environment(runtime_library, "argus-ahem-v34-inference")?;
+        let session = build_tuned_session(&environment, model_path)
             .map_err(|error| InferenceError::SessionLoad(error.to_string()))?;
         validate_ahem_v34_model_io(&session, &contract)?;
         Ok(Self {
@@ -881,13 +905,10 @@ impl AhemV61Expert {
         contract.validate()?;
         verify_sha256(model_path, &manifest.artifact_sha256)?;
 
-        ort::init_from(runtime_library)
-            .map_err(|error| InferenceError::RuntimeLoad(error.to_string()))?
-            .with_name("argus-ahem-v61-inference")
-            .commit();
+        let environment = runtime_environment(runtime_library, "argus-ahem-v61-inference")?;
 
         let threads = intra_threads.unwrap_or_else(cpu_intra_threads);
-        let session = build_tuned_session_with_threads(model_path, threads)
+        let session = build_tuned_session_with_threads(&environment, model_path, threads)
             .map_err(|error| InferenceError::SessionLoad(error.to_string()))?;
         validate_ahem_v61_model_io(&session, &contract)?;
 
@@ -1285,11 +1306,8 @@ impl OnnxFeedforwardForecaster {
         contract.validate()?;
         verify_sha256(model_path, &manifest.artifact_sha256)?;
 
-        ort::init_from(runtime_library)
-            .map_err(|error| InferenceError::RuntimeLoad(error.to_string()))?
-            .with_name("argus-feedforward-inference")
-            .commit();
-        let session = build_tuned_session(model_path)
+        let environment = runtime_environment(runtime_library, "argus-feedforward-inference")?;
+        let session = build_tuned_session(&environment, model_path)
             .map_err(|error| InferenceError::SessionLoad(error.to_string()))?;
         validate_feedforward_model_io(&session, &contract)?;
 
@@ -1454,11 +1472,8 @@ impl OnnxRouterForecaster {
         validate_runtime_compatibility(manifest)?;
         verify_sha256(model_path, &manifest.artifact_sha256)?;
 
-        ort::init_from(runtime_library)
-            .map_err(|error| InferenceError::RuntimeLoad(error.to_string()))?
-            .with_name("argus-router-inference")
-            .commit();
-        let session = build_tuned_session(model_path)
+        let environment = runtime_environment(runtime_library, "argus-router-inference")?;
+        let session = build_tuned_session(&environment, model_path)
             .map_err(|error| InferenceError::SessionLoad(error.to_string()))?;
         validate_router_model_io(&session)?;
 
@@ -1521,8 +1536,11 @@ impl OnnxRouterForecaster {
     }
 }
 
-fn build_tuned_session(model_path: &Path) -> ort::Result<Session> {
-    build_tuned_session_with_threads(model_path, cpu_intra_threads())
+fn build_tuned_session(
+    environment: &ort::environment::Environment,
+    model_path: &Path,
+) -> ort::Result<Session> {
+    build_tuned_session_with_threads(environment, model_path, cpu_intra_threads())
 }
 
 /// Builds an ONNX session tuned for CPU inference with an explicit intra-threads count.
@@ -1530,10 +1548,11 @@ fn build_tuned_session(model_path: &Path) -> ort::Result<Session> {
 /// # Errors
 /// Returns an error if ONNX session configuration or file loading fails.
 pub fn build_tuned_session_with_threads(
+    environment: &ort::environment::Environment,
     model_path: &Path,
     intra_threads: usize,
 ) -> ort::Result<Session> {
-    let builder = Session::builder()?;
+    let builder = Session::builder(environment)?;
     let builder = builder.with_optimization_level(GraphOptimizationLevel::All)?;
     let builder = builder.with_intra_threads(intra_threads)?;
     let builder = builder.with_inter_threads(1)?;
@@ -1559,12 +1578,9 @@ impl OnnxProbabilityExpert {
         contract.validate()?;
         verify_sha256(model_path, &manifest.artifact_sha256)?;
 
-        ort::init_from(runtime_library)
-            .map_err(|error| InferenceError::RuntimeLoad(error.to_string()))?
-            .with_name("argus-native-inference")
-            .commit();
+        let environment = runtime_environment(runtime_library, "argus-native-inference")?;
 
-        let session = build_tuned_session(model_path)
+        let session = build_tuned_session(&environment, model_path)
             .map_err(|error| InferenceError::SessionLoad(error.to_string()))?;
         validate_model_io(&session, &contract)?;
 
