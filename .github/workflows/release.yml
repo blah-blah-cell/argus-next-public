@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -34,7 +35,11 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $version = (Get-Content desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          } else {
+            $version = "${{ github.ref_name }}".TrimStart('v')
+          }
           "version=$version" >> $env:GITHUB_OUTPUT
           "prerelease=$($version.Contains('-'))" >> $env:GITHUB_OUTPUT
 
@@ -103,13 +108,26 @@ jobs:
           output-file: dist/sbom/argus-next.cdx.json
 
       - name: Attest build provenance
+        if: github.event_name == 'push'
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
             dist/setup/ArgusNextPublic-windows-x64-setup.exe
             dist/ArgusNextPublic-windows-x64.zip
 
+      - name: Upload validation artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-validation
+          path: |
+            dist/setup/ArgusNextPublic-windows-x64-setup.exe
+            dist/ArgusNextPublic-windows-x64.zip
+            dist/SHA256SUMS-RELEASE.txt
+          if-no-files-found: error
+
       - name: Publish release
+        if: github.event_name == 'push'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

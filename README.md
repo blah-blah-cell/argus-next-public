@@ -12,35 +12,17 @@ It is a prototype, not a security product. A forecast is not an attack verdict, 
 I haven't yet established how well this detects threats in a real network or how
 often it raises false alerts. Please don't rely on it as your only security tool.
 
-## Install on Windows
+## Current status
 
-**Pre-release safety notice:** The published alpha installer and uninstaller are
-under review. Please wait for an updated release before installing or uninstalling.
-The source remains available for technical review.
+**Please do not install or run the uninstaller from the published alpha.** Its
+installation and removal behavior needs further verification. Fixes are in the
+source, but have not yet been validated as a replacement release. The repository
+is available for code review; it is not yet ready for an NGO deployment.
 
-1. Open the [latest release](https://github.com/blah-blah-cell/argus-next-public/releases)
-   and download `ArgusNextPublic-windows-x64-setup.exe`.
-2. Run it. It installs for the current user, so there is no administrator prompt.
-3. Windows may warn that the publisher is unknown, because the build is unsigned.
-   Check the SHA-256 from the release notes first — see
-   [Verify your download](#verify-your-download).
-4. Launch **Argus Next Public** from the Start menu or the desktop shortcut.
-5. Capture starts stopped. Start monitoring explicitly, and only on networks you
-   are authorized to inspect.
-6. To remove it, use **Settings → Apps → Argus Next Public**. Captured data and
-   settings are retained and must be handled separately.
-
-The setup program verifies every embedded file before writing anything, then adds
-shortcuts and an uninstall entry. It does not install a capture driver, register a
-scheduled task, request elevation, create firewall rules, or download anything.
-The elevated sensor is registered only when you start live capture.
-
-Model forecasting is optional: the setup program ships the app and its weights, not
-a Python runtime. Without the optional PyTorch runtime the app still runs, captures
-and shows flows; the interface reports model readiness instead of hiding it. See
-the model runtime section of the [Windows build guide](docs/BUILD_WINDOWS.md).
-
-Full detail, requirements and command-line flags: [Windows install guide](docs/INSTALL_WINDOWS.md).
+The app currently targets Windows. Model forecasting is optional and requires a
+separately configured Python/PyTorch runtime; the packaged weights alone do not
+make forecasting available. See the [Windows build guide](docs/BUILD_WINDOWS.md).
+Live capture is opt-in and may require administrator approval.
 
 ### Requirements
 
@@ -48,25 +30,8 @@ Full detail, requirements and command-line flags: [Windows install guide](docs/I
 - The Microsoft Visual C++ x64 runtime.
 - Pktmon API support for live capture.
 
-### Unattended install
-
-```powershell
-.\ArgusNextPublic-windows-x64-setup.exe --silent
-.\ArgusNextPublic-windows-x64-setup.exe --install-dir D:\Tools\Argus --no-launch
-.\ArgusNextPublic-windows-x64-setup.exe --verify
-```
-
-## Verify your download
-
-Release notes publish the SHA-256 of both artifacts:
-
-```powershell
-Get-FileHash .\ArgusNextPublic-windows-x64-setup.exe -Algorithm SHA256
-```
-
-`--verify` re-hashes every embedded file. That establishes integrity relative to the
-publisher's manifest, which is not the same as publisher identity: the binaries are
-not code-signed yet. Treat an unexpected hash as a reason not to run the file.
+The [installation guide](docs/INSTALL_WINDOWS.md) documents intended behavior and
+its limitations; it is not a recommendation to run the current alpha installer.
 
 ## What it does
 
@@ -126,7 +91,7 @@ Build and test on Windows with Rust, Node 22+, and the Visual C++ build tools:
 .\scripts\build-windows.ps1
 ```
 
-The checks below are what CI enforces:
+Useful checks include:
 
 ```powershell
 cargo fmt --all --check
@@ -135,10 +100,11 @@ cargo test --locked --workspace --all-targets
 cargo test --locked --release --manifest-path installer/Cargo.toml
 node scripts/validate-desktop-ui.cjs
 node --test scripts/test-release-runtime.cjs
+node --test scripts/test-release-workflow.cjs
 node scripts/check-release-metadata.cjs
 ```
 
-`just check` runs the same set if you have [`just`](https://github.com/casey/just).
+See the [CI workflow](.github/workflows/ci.yml) for the complete check set.
 Packaging, installer and release steps are in
 [docs/BUILD_WINDOWS.md](docs/BUILD_WINDOWS.md); the installer can be smoke-tested
 without launching the app with `.\scripts\test-installer.ps1 -SetupPath <setup.exe>`.

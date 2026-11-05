@@ -1,7 +1,9 @@
 # Installing Argus Next on Windows
 
-**Pre-release safety notice:** The currently published alpha installer and
-uninstaller are under review. Please wait for a fixed release before using them.
+**Pre-release safety notice:** Do not use the currently published alpha installer
+or uninstaller. Fixes are in the source but a replacement release has not yet
+been verified. The instructions below describe intended behavior, not a current
+recommendation to install.
 
 The release page provides a setup program for 64-bit Windows. It installs for the
 current user, needs no administrator rights, and starts with capture stopped.
