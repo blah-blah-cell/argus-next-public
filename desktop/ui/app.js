@@ -56,6 +56,12 @@ function loadModelLatencyHistory() {
 const state = {
   run: null,
   runIsSimulation: false,
+  runIsLive: false,
+  runIsOfflineReplay: false,
+  importBusy: false,
+  initializing: true,
+  busy: false,
+  monitorControlBusy: false,
   flows: [],
   selected: null,
   rolling: false,
@@ -286,7 +292,7 @@ async function loadOnboardingReadiness() {
 }
 
 async function completeOnboarding() {
-  if (state.onboardingSaving) return;
+  if (state.importBusy || state.onboardingSaving) return;
   state.onboardingSaving = true;
   const next = $("onboarding-next");
   const skip = $("onboarding-skip");
@@ -516,7 +522,9 @@ function backgroundNotice(text, kind = "") {
 }
 
 function setBusy(busy, text) {
+  state.busy = busy;
   document.body.classList.toggle("loading", busy);
+  updateImportControl();
   if (text) notice(text);
 }
 
@@ -900,7 +908,7 @@ function renderAlerts(alerts, stats) {
     }
   }
 
-  const detectorEl = state.runIsSimulation ? null : $("metric-detector");
+  const detectorEl = state.runIsSimulation || state.runIsOfflineReplay ? null : $("metric-detector");
   const detectorDetailEl = $("metric-detector-detail");
   if (detectorEl && stats) {
     if (stats.totalAlerts > 0) {
@@ -1337,11 +1345,17 @@ function renderEvidence(run) {
   const entries = [
     ["Session", run.session],
     ["Source", run.source],
+    ["Analysis mode", state.runIsOfflineReplay ? "Offline replay · no live alerts or baseline updates" : state.runIsSimulation ? "Synthetic simulation" : "Capture analysis"],
+    ...(state.runIsOfflineReplay ? [
+      ["Forecast inference", "Not run for this file · forecast readiness is not a security verdict"],
+      ["Model availability", (state.modelCatalog || []).map((model) => `${model.id}: ${model.state} (${model.detail})`).join(" · ") || "Unavailable / not checked"],
+    ] : []),
     ["Detector", `${run.detector.id} / trained=${run.detector.trained}`],
     ["Feature schema", run.detector.featureSchema],
     ["Source records", formatNumber(run.health.sourceRecords)],
     ["Normalized packets", formatNumber(run.health.normalizedPackets)],
     ["Processed packets", formatNumber(run.health.processedPackets)],
+    ["Non-IP records excluded", formatNumber(run.health.nonIpRecords)],
     ["Unsupported records", formatNumber(run.health.unsupportedRecords)],
     ["Malformed records", formatNumber(run.health.malformedRecords)],
     ["Reported packet loss", formatNumber(run.health.reportedLostPackets)],
@@ -1511,6 +1525,7 @@ async function tryCnn(predict = true) {
 
 async function loadCaptures(selectNewest = false) {
   const captures = await invoke("recent_captures");
+  if (state.runIsOfflineReplay && !selectNewest) return captures;
   if (!captures.length) {
     state.activeCapturePath = null;
     return captures;
@@ -1523,6 +1538,7 @@ async function loadCaptures(selectNewest = false) {
 
 function updateRollingControl(status) {
   state.rolling = status.running;
+  state.monitorStopping = Boolean(status.stopping);
   state.sensorHealth = status.sensor ?? null;
   const button = $("rolling-button");
   button.classList.toggle("active", status.running);
@@ -1531,7 +1547,8 @@ function updateRollingControl(status) {
     : status.running
       ? "Stop monitoring"
       : "Start monitoring";
-  button.disabled = status.stopping;
+  button.disabled = status.stopping || state.importBusy;
+  updateImportControl();
   if (status.sensor) {
     const sensorIssues =
       status.sensor.missedWrites +
@@ -1552,7 +1569,7 @@ async function loadLiveHistory() {
   const history = await invoke("live_history");
   renderTrafficTimeline(history);
   if (!history.segments) return history;
-  if (!state.activeCapturePath || /[\\/]live[\\/]/i.test(state.activeCapturePath)) {
+  if (!state.runIsOfflineReplay && (!state.activeCapturePath || /[\\/]live[\\/]/i.test(state.activeCapturePath))) {
     state.flows = history.flows;
     renderBars(state.flows);
     renderTopology(state.flows);
@@ -1663,6 +1680,9 @@ function renderTrafficTimeline(history) {
 window.addEventListener("argus:traffic-explorer-ready", () => renderTrafficTimeline(state.liveHistory));
 
 async function toggleRollingCapture() {
+  if (state.importBusy || state.busy || state.monitorControlBusy) return;
+  state.monitorControlBusy = true;
+  updateImportControl();
   try {
     if (state.rolling) {
       state.userStoppedRolling = true;
@@ -1680,11 +1700,14 @@ async function toggleRollingCapture() {
     updateRollingControl(await invoke("start_rolling_capture"));
   } catch (error) {
     notice(String(error), "error");
+  } finally {
+    state.monitorControlBusy = false;
+    updateImportControl();
   }
 }
 
 async function ensureRollingCapture() {
-  if (state.userStoppedRolling || Date.now() < state.autoStartAfter) return;
+  if (state.userStoppedRolling || state.importBusy || Date.now() < state.autoStartAfter) return;
   try {
     updateRollingControl(await invoke("start_rolling_capture"));
     state.autoStartAfter = 0;
@@ -1735,7 +1758,7 @@ async function retryPendingCaptureReleases(now = Date.now()) {
 }
 
 async function rollingTick() {
-  if (state.rollingTickBusy) return;
+  if (state.importBusy || state.rollingTickBusy) return;
   state.rollingTickBusy = true;
   try {
     const status = await invoke("rolling_capture_status");
@@ -1836,7 +1859,7 @@ async function replaySelected(background = false) {
     setBusy(true, "Parsing and analyzing the selected capture locally…");
   }
   try {
-    renderRun(await invoke("replay_capture", { path }), false);
+    renderRun(await invoke("replay_capture", { path }), false, background, false);
     if (/[\\/]live[\\/]/i.test(path)) await loadLiveHistory();
     await loadAlerts();
     if (!background) {
@@ -1859,9 +1882,90 @@ async function replaySelected(background = false) {
   }
 }
 
-function renderRun(run, simulation = state.runIsSimulation) {
+function updateImportControl() {
+  const button = $("import-replay-button");
+  if (!button) return;
+  button.disabled = Boolean(state.initializing || state.importBusy || state.busy || state.rolling || state.monitorStopping || state.monitorControlBusy || state.onboardingSaving);
+  button.textContent = state.importBusy ? "Importing capture…" : "Import capture & replay";
+  const hint = $("import-replay-hint");
+  if (hint) hint.textContent = state.rolling
+    ? "Stop monitoring before importing a file. Offline replay never starts capture."
+    : "Open a local PCAP or PCAPNG. No live capture, baseline updates, or saved alerts.";
+  $("offline-replay")?.setAttribute("aria-busy", String(Boolean(state.importBusy)));
+}
+
+function clearReplayModelOutput() {
+  state.lastModelResult = null;
+  renderModelActivity(null, "idle");
+  if ($("cnn-result")) $("cnn-result").hidden = true;
+  $("forecast-facts")?.replaceChildren();
+  $("forecast-errors")?.replaceChildren();
+}
+
+function validateReplayRun(run, path) {
+  const healthFields = ["sourceRecords", "normalizedPackets", "processedPackets", "flows", "nonIpRecords", "unsupportedRecords", "malformedRecords", "reportedLostPackets", "truncatedPackets", "reorderedPackets", "queueOverflows", "parseErrors", "sourceErrors"];
+  if (!run || typeof run.source !== "string" || typeof run.session !== "string" || !run.detector || !Array.isArray(run.flows) || !run.health || healthFields.some((key) => !Number.isFinite(run.health[key]) || run.health[key] < 0)) {
+    throw new Error("The runtime returned invalid capture evidence");
+  }
+  if (run.flows.some((flow) => !flow || typeof flow !== "object" || !Number.isFinite(flow.id) || typeof flow.protocol !== "string" || typeof flow.initiatorAddress !== "string" || typeof flow.responderAddress !== "string")) {
+    throw new Error("The runtime returned invalid flow evidence");
+  }
+  if (typeof path !== "string" || run.source !== path.split(/[\\/]/).pop()) {
+    throw new Error("The runtime capture source does not match the selected file");
+  }
+  return run;
+}
+
+async function importReplayCapture() {
+  if (state.initializing || state.importBusy || state.busy || state.rolling || state.monitorStopping || state.rollingTickBusy || state.monitorControlBusy || state.onboardingSaving) {
+    $("import-replay-status").textContent = "Import unavailable while monitoring or another operation is busy. Stop monitoring and try again.";
+    return false;
+  }
+  state.importBusy = true;
+  updateImportControl();
+  $("rolling-button").disabled = true;
+  const status = $("import-replay-status");
+  status.textContent = "Choose a capture file. Cancel leaves the displayed evidence unchanged.";
+  const previousPath = state.activeCapturePath;
+  try {
+    const path = await invoke("choose_replay_capture");
+    if (!path) {
+      status.textContent = "Import cancelled. Displayed evidence is unchanged.";
+      return false;
+    }
+    status.textContent = "Replaying locally… Previous evidence remains displayed until this file succeeds.";
+    const run = validateReplayRun(await invoke("replay_capture", { path }), path);
+    clearReplayModelOutput();
+    closeFlow();
+    state.selected = null;
+    state.activeCapturePath = path;
+    state.userStoppedRolling = true;
+    state.flowPagination.page = 1;
+    renderRun(run, false, false, true);
+    status.textContent = "Offline replay complete. Inspect flows and capture evidence below. Forecast inference was not run; model availability is not a security verdict.";
+    notice("Offline replay complete. No live alerts or learning history updated.", "success");
+    return true;
+  } catch (error) {
+    state.activeCapturePath = previousPath;
+    status.textContent = `Import failed: ${String(error)}. Previous evidence remains displayed; no results from this file were loaded.`;
+    notice(status.textContent, "error");
+    return false;
+  } finally {
+    state.importBusy = false;
+    updateImportControl();
+    $("rolling-button").disabled = Boolean(state.monitorStopping || state.monitorControlBusy);
+  }
+}
+
+function renderRun(run, simulation = state.runIsSimulation, live = state.runIsLive, offline = state.runIsOfflineReplay) {
   state.run = run;
   state.runIsSimulation = simulation;
+  state.runIsLive = live && !simulation;
+  state.runIsOfflineReplay = offline && !live && !simulation;
+  const sourceLabel = $("analysis-source");
+  if (sourceLabel) sourceLabel.textContent = state.runIsOfflineReplay
+    ? `OFFLINE REPLAY · ${run.source} · read-only analysis; not live monitoring`
+    : simulation ? "SYNTHETIC SIMULATION · not live traffic" : live ? "LIVE CAPTURE ANALYSIS" : "CAPTURE ANALYSIS";
   state.flows = run.flows;
   $("metric-packets").textContent = formatNumber(run.health.processedPackets);
   $("metric-records").textContent =
@@ -1872,7 +1976,12 @@ function renderRun(run, simulation = state.runIsSimulation) {
   const qualityFlows = (run.flows || []).filter(
     (flow) => flow.lostPackets || flow.truncatedPackets || flow.reorderedPackets,
   );
-  if (simulation) {
+  if (state.runIsOfflineReplay) {
+    const matches = (run.flows || []).filter((flow) => flow.attackVerdict);
+    $("metric-detector").textContent = `${matches.length} REPLAY RULE MATCH${matches.length === 1 ? "" : "ES"}`;
+    $("metric-detector").style.color = matches.length ? "var(--amber)" : "var(--cyan)";
+    $("metric-detector-detail").textContent = "This file only · deterministic rule evidence; not a model security verdict or saved live alert";
+  } else if (simulation) {
     const matches = (run.flows || []).filter((flow) => flow.attackVerdict);
     $("metric-detector").textContent = `${matches.length} SIMULATION RULE MATCH${matches.length === 1 ? "" : "ES"}`;
     $("metric-detector").style.color = matches.length ? "var(--amber)" : "var(--cyan)";
@@ -1906,20 +2015,31 @@ function renderCaptureQuality(run) {
     run.health.reportedLostPackets +
     run.health.truncatedPackets +
     run.health.reorderedPackets +
-    run.health.parseErrors;
-  const sensorDrops = !state.runIsSimulation && state.sensorHealth
-    ? state.sensorHealth.missedWrites +
-      state.sensorHealth.missedReads +
-      state.sensorHealth.applicationDrops
+    run.health.parseErrors +
+    run.health.malformedRecords +
+    run.health.queueOverflows +
+    run.health.sourceErrors;
+  const liveSensor = state.runIsLive && !state.runIsSimulation ? state.sensorHealth : null;
+  const sensorDrops = liveSensor
+    ? liveSensor.missedWrites +
+      liveSensor.missedReads +
+      liveSensor.applicationDrops
     : 0;
-  const sensorMalformed = state.runIsSimulation ? 0 : (state.sensorHealth?.malformed ?? 0);
-  const retentionEvictions = state.runIsSimulation ? 0 : (state.sensorHealth?.retentionEvictions ?? 0);
+  const sensorMalformed = liveSensor?.malformed ?? 0;
+  const retentionEvictions = liveSensor?.retentionEvictions ?? 0;
   const qualityIssues = segmentIssues + sensorDrops + sensorMalformed;
+  const partialCoverage = run.health.unsupportedRecords > 0;
+  const noAnalyzablePackets = run.health.sourceRecords > 0 && run.health.normalizedPackets === 0;
   $("metric-quality").textContent =
-    qualityIssues === 0 ? "NO REPORTED LOSS" : `${formatNumber(qualityIssues)} CAPTURE ISSUES`;
-  $("metric-quality").style.color = qualityIssues === 0 ? "#34d399" : "#f59e0b";
+    qualityIssues > 0 ? `${formatNumber(qualityIssues)} CAPTURE ISSUES`
+      : noAnalyzablePackets ? "NO ANALYZABLE IP PACKETS"
+        : partialCoverage ? "PARTIAL PROTOCOL COVERAGE" : "NO REPORTED LOSS";
+  $("metric-quality").style.color = qualityIssues === 0 && !partialCoverage && !noAnalyzablePackets ? "#34d399" : "#f59e0b";
+  const sensorDetail = liveSensor
+    ? ` · live sensor totals: ${formatNumber(sensorDrops)} native drops · ${formatNumber(sensorMalformed)} malformed · ${formatNumber(retentionEvictions)} capture files retired`
+    : "";
   $("metric-quality-detail").textContent =
-    `${run.health.reportedLostPackets} source lost · ${run.health.truncatedPackets} truncated · ${run.health.reorderedPackets} reordered · ${formatNumber(sensorDrops)} native drops · ${formatNumber(retentionEvictions)} capture files retired`;
+    `${run.health.reportedLostPackets} source lost · ${run.health.truncatedPackets} truncated · ${run.health.reorderedPackets} reordered · ${formatNumber(run.health.nonIpRecords)} non-IP excluded · ${formatNumber(run.health.unsupportedRecords)} unsupported · ${formatNumber(run.health.malformedRecords)} malformed · ${formatNumber(run.health.parseErrors)} parse errors · ${formatNumber(run.health.sourceErrors)} source errors · ${formatNumber(run.health.queueOverflows)} queue overflows${sensorDetail}`;
 }
 
 function renderBars(flows) {
@@ -2310,7 +2430,7 @@ function renderTable(flows) {
       : flow.protocol;
     let threatText = "Nominal";
     let threatClass = "quality-good";
-    const activeRule = (state.blacklistRules || []).find(
+    const activeRule = (state.runIsOfflineReplay ? [] : state.blacklistRules || []).find(
       (rule) => rule.active && (
         rule.target === flow.matchedRuleTarget
         || [flow.initiatorAddress, flow.responderAddress].includes(rule.target)
@@ -2355,7 +2475,20 @@ function renderTable(flows) {
     ];
     values.forEach((value, index) => {
       const cell = document.createElement("td");
-      cell.textContent = value;
+      if (index === 0) {
+        const inspect = document.createElement("button");
+        inspect.type = "button";
+        inspect.className = "flow-inspect-button";
+        inspect.textContent = value;
+        inspect.setAttribute("aria-label", `Inspect flow ${flow.id} rule and capture evidence`);
+        inspect.addEventListener("click", (event) => {
+          event.stopPropagation();
+          state.flowInspectTrigger = inspect;
+          openFlow(flow);
+          $("drawer-close")?.focus?.();
+        });
+        cell.append(inspect);
+      } else cell.textContent = value;
       if ([0, 2, 3].includes(index)) cell.className = "mono";
       if (index === 1) cell.className = "protocol";
       if (index === 7) cell.className = threatClass;
@@ -2420,10 +2553,10 @@ function openFlow(flow) {
   $("direction-value").textContent =
     `${flow.initiatorPackets} → / ${flow.responderPackets} ←`;
   const issues = [];
-  const flowHasAllowRule = (state.blacklistRules || []).some(
+  const flowHasAllowRule = (state.runIsOfflineReplay ? [] : state.blacklistRules || []).some(
     (rule) => rule.active && rule.action === "allow" && [flow.initiatorAddress, flow.responderAddress].includes(rule.target),
   );
-  if (flow.attackVerdict && !flow.isAllowlisted && !flowHasAllowRule) {
+  if (flow.attackVerdict && (state.runIsOfflineReplay || (!flow.isAllowlisted && !flowHasAllowRule))) {
     issues.push(`${flow.attackVerdict.summary}: ${flow.attackVerdict.evidence.join(", ")}`);
   }
   if (flow.threatStatus) issues.push(flow.threatStatus);
@@ -2434,7 +2567,7 @@ function openFlow(flow) {
     ? issues.join(" · ")
     : "No capture-quality loss observed.";
 
-  const activeRule = (state.blacklistRules || []).find(
+  const activeRule = (state.runIsOfflineReplay ? [] : state.blacklistRules || []).find(
     (rule) => rule.active && (
       rule.target === flow.matchedRuleTarget
       || [flow.initiatorAddress, flow.responderAddress].includes(rule.target)
@@ -2480,6 +2613,7 @@ function openFlow(flow) {
       blockBtn.style.borderColor = "#e11d48";
     }
     blockBtn.onclick = async () => {
+      if (state.runIsOfflineReplay) return;
       try {
         if (isBlocked || isBlocklisted || isWatchlisted) {
           const target = activeRule?.target || flow.initiatorAddress;
@@ -2511,6 +2645,7 @@ function openFlow(flow) {
     if (allowBtn) {
       allowBtn.textContent = isAllowlisted ? "Remove Allow" : "Allow";
       allowBtn.onclick = async () => {
+        if (state.runIsOfflineReplay) return;
         try {
           if (isAllowlisted) {
             const target = activeRule?.target || flow.initiatorAddress;
@@ -2531,6 +2666,12 @@ function openFlow(flow) {
           notice(`Failed to update allow rule: ${err}`, "error");
         }
       };
+    }
+    blockBtn.disabled = Boolean(state.runIsOfflineReplay);
+    if (allowBtn) allowBtn.disabled = Boolean(state.runIsOfflineReplay);
+    if (state.runIsOfflineReplay) {
+      statusEl.textContent = "Offline replay is read-only. Imported endpoints may not belong to this device; live block, allow, and firewall actions are disabled.";
+      statusEl.className = "flow-defense-status";
     }
   }
 
@@ -2581,6 +2722,10 @@ function closeFlow() {
   $("flow-drawer").classList.remove("open");
   $("flow-drawer").setAttribute("aria-hidden", "true");
   $("scrim").classList.remove("open");
+  if (typeof state !== "undefined") {
+    state.flowInspectTrigger?.focus?.();
+    state.flowInspectTrigger = null;
+  }
 }
 
 let currentFlowPayload = null;
@@ -2666,6 +2811,7 @@ document.querySelectorAll("[data-drawer-tab]").forEach((btn) => {
 });
 
 $("rolling-button").addEventListener("click", toggleRollingCapture);
+$("import-replay-button").addEventListener("click", importReplayCapture);
 $("diagnostics-button").addEventListener("click", () => {
   loadDiagnostics().catch((error) => notice(String(error), "error"));
 });
@@ -4522,6 +4668,8 @@ async function initialize() {
   ]);
   const status = await invoke("rolling_capture_status");
   updateRollingControl(status);
+  state.initializing = false;
+  updateImportControl();
   if (!status.running) {
     notice(
       status.startupError

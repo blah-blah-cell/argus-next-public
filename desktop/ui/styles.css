@@ -5760,3 +5760,23 @@ button:active { transform: translateY(1px); }
   .timeline-copy { border-right: 0; }
   .timeline-stats { border-left: 0; }
 }
+.offline-replay {
+  margin-block: 16px;
+  padding: 18px;
+}
+.offline-replay p { margin-block: 10px 0; overflow-wrap: anywhere; }
+.offline-replay button:disabled { cursor: not-allowed; opacity: .65; }
+.analysis-source { font-weight: 600; }
+.flow-inspect-button {
+  color: inherit;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  padding: 6px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+#import-replay-button:focus-visible, .flow-inspect-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}

@@ -19,7 +19,7 @@ const setupStage=createSetupStage({setup,pin:document.querySelector('.spatial-pi
     if(enter?.firstChild)enter.firstChild.textContent=step<0?['Explore Argus ','Continue to evidence ','Set up this device '][chapter]:step===0?'Continue to device checks ':'Continue to start ';
     if(step>=0)window.dispatchEvent(new CustomEvent('argus:setup-stage',{detail:{step}}));
   }});
-const overview = new Set(['spatial-workspace','spatial-endpoint-workspace','rolling-summary','traffic-timeline']);
+const overview = new Set(['spatial-workspace','spatial-endpoint-workspace','rolling-summary','traffic-timeline','offline-replay']);
 const names = {overview:'Network overview',flows:'Flow explorer',xray:'Network X-Ray',evidence:'Capture evidence',models:'Model workspace',alerts:'Alerts',simulation:'Simulation lab','active-defense':'Attack control',diagnostics:'Runtime diagnostics'};
 const subtitle = document.querySelector('.header-subtitle');
 const originalSubtitle = subtitle.textContent;

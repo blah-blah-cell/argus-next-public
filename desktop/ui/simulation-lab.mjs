@@ -11,6 +11,12 @@ export function scenarioCatalog(value) {
     ids.add(item.id);return item;
   });
 }
+export function replayQualityIssues(health) {
+  // These are explicit capture failures, not normal filtering or model warmup.
+  const counters=['malformedRecords','reportedLostPackets','truncatedPackets','queueOverflows','parseErrors','sourceErrors'];
+  if(!health||counters.some(key=>!Number.isSafeInteger(health[key])||health[key]<0))return ['Capture quality counters unavailable or invalid.'];
+  return counters.filter(key=>health[key]>0).map(key=>`${key}: ${health[key]}`);
+}
 export function createLabController(execute,onChange=()=>{},now=()=>Date.now()) {
   let busy=false,stopping=false,queue=[],history=[],sequence=0;
   const snapshot=()=>({busy,stopping,queue:queue.map(item=>({...item})),history:[...history]});
@@ -32,8 +38,9 @@ export function createLabController(execute,onChange=()=>{},now=()=>Date.now()) 
             const result=await execute(item.id,count);
             if(result?.scenarioId!==item.id||!result.run||!Array.isArray(result.run.flows))throw new Error('Runtime returned an invalid or mismatched replay result.');
             const forecasts=Object.values(result.modelResult?.models||{}).filter(output=>output.state==='forecast_only');
-            const status=result.modelError||!forecasts.length?'partial':'complete';
-            record={key:++sequence,id:item.id,title:item.title,status,result,elapsedMs:Math.max(0,now()-start),count};
+            const qualityIssues=replayQualityIssues(result.run.health);
+            const status=result.modelError||!forecasts.length||qualityIssues.length?'partial':'complete';
+            record={key:++sequence,id:item.id,title:item.title,status,result,qualityIssues,elapsedMs:Math.max(0,now()-start),count};
           } catch(error) {
             record={key:++sequence,id:item.id,title:item.title,status:'failed',error:String(error),elapsedMs:Math.max(0,now()-start),count};
           }
@@ -76,7 +83,8 @@ export function mountSimulationLab(root,bridge) {
     }
     bridge.renderModels(result);
     const flows=result.run.flows;
-    $('sim-evidence-summary').textContent=`${Math.min(flows.length,100)} of ${flows.length} replay flows shown. Temporary PCAP removed by the runtime after replay. No live alerts or model memory were updated.`;
+    const quality=record.qualityIssues?.length?` Capture quality incomplete: ${record.qualityIssues.join('; ')}.`:'';
+    $('sim-evidence-summary').textContent=`${Math.min(flows.length,100)} of ${flows.length} replay flows shown.${quality} Temporary PCAP removed by the runtime after replay. No live alerts or model memory were updated.`;
     for(const flow of flows.slice(0,100)) {
       const row=make('tr'),item=flowEvidence(flow);
       row.append(make('td',item.endpoints),make('td',item.protocol),make('td',item.packets));
@@ -89,7 +97,7 @@ export function mountSimulationLab(root,bridge) {
     cards.setAttribute('aria-busy',String(loading));
     const done=state.queue.filter(item=>['complete','partial','failed'].includes(item.status)).length;
     if(state.busy)status.textContent=state.stopping?'Stopping after the current replay finishes. No new scenario will start.':`Running ${state.queue.find(item=>item.status==='running')?.title??'suite'} · ${done} / ${state.queue.length} finished`;
-    else if(state.queue.length)status.textContent=`${done} / ${state.queue.length} finished · ${state.queue.filter(item=>item.status==='failed').length} failed · ${state.queue.filter(item=>item.status==='partial').length} with unavailable forecasts · ${state.queue.filter(item=>item.status==='skipped').length} skipped`;
+    else if(state.queue.length)status.textContent=`${done} / ${state.queue.length} finished · ${state.queue.filter(item=>item.status==='failed').length} failed · ${state.queue.filter(item=>item.status==='partial').length} partial (forecasts or capture quality) · ${state.queue.filter(item=>item.status==='skipped').length} skipped`;
     const queue=$('sim-run-queue');queue.replaceChildren();
     for(const item of state.queue)queue.append(make('li',`${item.title} — ${item.status}`));
     const latest=state.history[0];

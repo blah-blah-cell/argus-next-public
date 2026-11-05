@@ -23,5 +23,8 @@ sha2 = "0.10.9"
 tauri = { version = "2.11.5", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 
+[target.'cfg(windows)'.dependencies]
+rfd = { version = "0.17.2", default-features = false }
+
 [lints]
 workspace = true
