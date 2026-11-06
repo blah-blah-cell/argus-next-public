@@ -7,12 +7,12 @@ name = "argus-research"
 version = "0.1.0"
 description = "Research-side validation tools and model-artifact contracts for Argus Next."
 requires-python = ">=3.11,<3.14"
-dependencies = ["torch==2.7.1", "numpy>=1.26,<3"]
+dependencies = ["torch==2.15.0", "numpy>=1.26,<3"]
 
 [project.optional-dependencies]
-export = ["onnx==1.22.0", "onnxruntime==1.29.0"]
+export = ["onnx==1.23.2", "onnxruntime==1.31.1"]
 laya-router = [
-    "laya==0.3.4",
+    "laya==0.4.20",
     "safetensors>=0.4.5,<1",
     "transformers>=4.48,<5",
 ]
@@ -22,7 +22,7 @@ dev = [
     "numpy",
     "pandas",
     "pytest>=8,<10",
-    "ruff==0.12.12",
+    "ruff==0.17.3",
     "scikit-learn",
 ]
 
