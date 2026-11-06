@@ -14,7 +14,7 @@ export = ["onnx==1.22.0", "onnxruntime==1.29.0"]
 laya-router = [
     "laya==0.3.4",
     "safetensors>=0.4.5,<1",
-    "transformers>=4.48,<5",
+    "transformers>=4.48,<6",
 ]
 real-data = ["dpkt==1.9.8", "numpy", "pandas", "scikit-learn", "torch"]
 dev = [
