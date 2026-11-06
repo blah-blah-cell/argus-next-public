@@ -13,10 +13,13 @@ Those are recorded in `docs/adr/`. Everything else below is still ahead.
 
 ## Guiding constraints
 
-- Windows is the supported platform for pilots; Linux and macOS are in progress.
+- Windows is the initial evaluation target, not yet approved for an
+  organizational deployment; Linux and macOS are in progress.
 - The app must stay useful with no cloud service and no internet connection.
 - Capture is always an explicit action. Nothing starts recording on its own.
-- Metadata is the default; raw payload capture is an explicit, bounded choice.
+- **Goal, not current behavior:** metadata-first capture with an explicit,
+  bounded choice for payload retention. Current live capture writes temporary
+  PCAP segments that can contain payloads; see ADR 0003.
 - Forecasts are research outputs, not validated attack detections.
 - A prototype that quietly overstates itself is worse than a small honest tool.
 
@@ -31,8 +34,8 @@ CycloneDX SBOM and build provenance, with a guarded Authenticode step.
 
 Remaining before pilot conversations:
 
-- Run the release workflow once and confirm the SBOM, checksums and provenance
-  are attached to a downloadable artifact.
+- Verify release provenance independently in addition to the published SBOM
+  and checksum files; confirm fresh-system startup and capture boundaries.
 - Provision a signing certificate so Authenticode replaces the current
   "publisher unknown" warning.
 - Threat model covering the elevated Pktmon sensor, the scheduled task, and the
@@ -42,7 +45,36 @@ Remaining before pilot conversations:
 Exit criteria: a stranger can download a release, verify hashes, read the
 license, and report a vulnerability without asking a question.
 
-## Phase 1 — Installed app without Python (~4–6 weeks)
+## Phase 1 — Safe single-machine evaluation (next)
+
+Start with an authorized, known capture or explicitly generated test traffic;
+do not require an organization to expose normal network traffic. Make replay
+results distinguish observed flows, unsupported or skipped data, and the
+reasons behind any alert. Confirm what files are written, where they live, and
+what a user must do to remove them. Add bounded retention and privacy controls
+only with tests that verify actual behavior; do not label live capture
+metadata-only until the implementation makes that true.
+
+Development implementation: the desktop now has a native PCAP/PCAPNG picker,
+offline source labeling, replay-local rules, capture-quality evidence and
+read-only flow inspection. Replay does not run forecasting automatically.
+This work has not been packaged in alpha.3. Native picker interaction and
+clean-machine end-to-end usability still need verification; tests and browser
+fixtures do not establish those outcomes. Low-disk protection is best effort,
+not a complete hard quota or metadata-only capture mode.
+
+Measure setup, idle and monitoring CPU/RAM, storage growth, and interruption
+recovery on identified Windows machines. A repeated run on one PC is not an
+independent site. Use labeled or controlled traffic when assessing alerts;
+report misses, false alerts, and unsupported cases as well as successes. A
+forecast-loss improvement is not an intrusion-detection result.
+
+Exit criteria: a reviewer can replay an authorized capture without starting
+live monitoring, see what was processed or omitted and why, and understand the
+files created and the limitations. Privacy controls and resource measurements
+must be verified, not inferred from defaults.
+
+## Phase 2 — Installed app without Python (planned)
 
 The installed app currently launches without a model runtime. Closing that gap
 removes the largest remaining install friction.
@@ -60,7 +92,7 @@ removes the largest remaining install friction.
 Exit criteria: a fresh install forecasts on a machine with no Python, and the
 app explains its own readiness truthfully.
 
-## Phase 2 — Survivable unattended operation (~4–6 weeks)
+## Phase 3 — Survivable unattended operation (planned)
 
 - Tiered retention with hard quotas across raw captures, flows, alerts, and
   generated reports. Exported reports currently have no visible rotation.
@@ -77,7 +109,7 @@ app explains its own readiness truthfully.
 Exit criteria: a site runs for 30 days without filling a disk, without manual
 restarts, and with alerts reaching someone who is not staring at the dashboard.
 
-## Phase 3 — More than one site (~8–12 weeks, gated on two successful pilots)
+## Phase 4 — More than one site (gated on two successful pilots)
 
 - `argus-sensor`: headless capture service sharing the current capture core.
 - `argus-collector`: single binary plus database, metadata-first ingestion,
@@ -89,7 +121,7 @@ restarts, and with alerts reaching someone who is not staring at the dashboard.
 Exit criteria: two sites report to one collector and one search view; a sensor
 offline for an hour loses nothing beyond configured policy.
 
-## Phase 4 — Scale and interoperability (ongoing)
+## Phase 5 — Scale and interoperability (ongoing)
 
 - Columnar archives (Parquet/DuckDB) for long retention and fast queries.
 - Ingestion of NetFlow/IPFIX and Zeek or Suricata logs for organizations that
@@ -113,10 +145,12 @@ offline for an hour loses nothing beyond configured policy.
 
 ## Sizing guidance
 
-At 10 Mbps sustained, raw PCAP is roughly 4.5 GB per hour and about 108 GB per
-day. Raw retention therefore belongs in hours, not days. Flow metadata is a few
-hundred megabytes per day at the same rate. Defaults should favor metadata,
-short raw rings, and explicit opt-in for long payload retention.
+At 10 Mbps sustained, the traffic volume is roughly 4.5 GB per hour and 108 GB
+per day before capture overhead and any truncation or filtering. Actual PCAP and
+flow-metadata storage depends on traffic, capture configuration, and schema;
+measure it rather than assuming a fixed daily metadata volume. Defaults should
+favor metadata, short raw rings, and explicit opt-in for payload retention once
+those controls exist.
 
 ## Explicit non-goals
 
