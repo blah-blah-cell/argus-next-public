@@ -31,6 +31,8 @@ $files = [ordered]@{
     'docs/PORTABLE_WINDOWS.md' = 'README.md'
     'desktop/ui/spatial/assets/NOTICE.md' = 'THIRD_PARTY/hero-assets-NOTICE.md'
     'desktop/ui/vendor/three/LICENSE' = 'THIRD_PARTY/three-LICENSE.txt'
+    'models/NOTICE.md' = 'models/NOTICE.md'
+    'NOTICE' = 'NOTICE'
 }
 $optionalModels = @(
     'models/ahem_v61.onnx',
