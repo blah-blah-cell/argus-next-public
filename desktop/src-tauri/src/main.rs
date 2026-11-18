@@ -6279,7 +6279,9 @@ mod tests {
     #[test]
     fn test_storage_roots_are_process_local_and_never_use_operator_state() {
         let root = super::development_root().expect("isolated test root");
-        assert!(root.starts_with(std::env::temp_dir()));
+        let temporary_root =
+            dunce::canonicalize(std::env::temp_dir()).expect("canonical temporary root");
+        assert!(root.starts_with(temporary_root));
         assert!(
             root.file_name()
                 .unwrap()
