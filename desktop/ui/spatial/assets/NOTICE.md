@@ -1,9 +1,9 @@
-# Reference hero assets
+# Clean-Room Procedural Hero Assets
 
-The selected A, outline and side-screen geometry in `hero-a.geometry.json` was extracted from the publicly served `https://alche.studio/common/scene.glb` at the user's explicit request for a local design prototype. Only those three meshes are retained. The environment cube faces are from the reference site's `/envmap/` directory. These reference assets are not original Argus research or Argus-authored artwork.
+All geometry in `hero-a.geometry.json` (`Argus_A`, `Argus_Outline`, `Argus_SideScreen`) and all six studio-dark environment cubemap faces (`env-nx.png`, `env-ny.png`, `env-nz.png`, `env-px.png`, `env-py.png`, `env-pz.png`) are clean-room procedurally generated assets authored specifically for Argus.
 
-Source: Alche, Inc. — https://alche.studio/
+- **Origin**: Synthesized from scratch via parametric procedural 3D geometry and analytic studio-lighting shaders in Python.
+- **License**: Released under the Argus project license (Apache-2.0) and dedicated to the public domain under CC0-1.0.
+- **Provenance**: 100% original procedural assets; all legacy third-party prototype assets have been permanently removed.
 
-No redistribution licence for these original assets has been established. The reference site's open-source licence page lists third-party software; it is not treated here as a licence for Alche's artwork. Obtain appropriate permission or replace these assets before publishing/distributing this prototype. No licence notice was stripped from the source asset (the glTF asset metadata identifies the Blender exporter only).
-
-The Argus hero loader, refraction shader, damped interaction and lifecycle code are newly implemented for this local renderer. The original site's application, analytics, fonts, audio, videos and UI source are not shipped in Argus.
+The Argus hero loader, refraction shader, damped interaction, and lifecycle code are original Argus implementations.

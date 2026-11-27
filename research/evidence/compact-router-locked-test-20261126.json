@@ -1,0 +1,169 @@
+{
+  "schema": "argus.compact-router-locked-test/v1",
+  "created_utc": "2026-11-26T17:57:14.562404+00:00",
+  "locked_test_evaluated_once": true,
+  "prepared_dir": "argus-dev/laya-router-prepared-v1-20260921",
+  "prepared_manifest_sha256": "a0ab709183d4ed74543c66e680e16a7942869bd968c632379776a41e641b9528",
+  "partition_sha256": {
+    "train.jsonl": "36190a3ebf2f494e0e2895ec61d6449895f3e6f922931aeed66f405a010fa01e",
+    "train.counterfactual.jsonl": "51cbc1a2b0d25e4110d67b6fa533fa711b169cd222b00352c90c8d4178123cf3",
+    "calibration.jsonl": "29064b09bf877cb76023ef71ab57b589b00ec72882d5c8e48737bd6436fe2cdc",
+    "calibration.counterfactual.jsonl": "e237b7a928c0ba5dd0ac9b67087e28aee3c95fe0a2d21dc178394a41abffa1f7",
+    "test.jsonl": "1a2c349aa3ed051a78c4315c6009dda24c16ae1f7f8fcf9f53e2b4810a932151",
+    "test.counterfactual.jsonl": "8f87074dbfe2d2c60004436e96f0fbcaec4bb6fbdf1c7337a72061e775161d3d"
+  },
+  "compact_router_artifact": {
+    "path": "research/evidence/compact-router-v1.json",
+    "bytes": 4591,
+    "kilobytes": 4.483,
+    "strict_under_50kb": true,
+    "sha256": "ee4c12344e05e4ee1b3530412e2a689c2819c548c818c8e77d0cbadbf690dfce"
+  },
+  "laya_v2_quarantined_baseline": {
+    "model_id": "argus.laya-episode-router-v2",
+    "parameters": 421293827,
+    "model_safetensors_bytes": 842609220,
+    "locked_test_jsonl_sha256": null,
+    "rtx3050_batch1_median_ms": 61.3785,
+    "rtx3050_batch1_p95_ms": 127.7646,
+    "rtx3050_peak_vram_mb": 831.39,
+    "speedup_factor_cpu_compact_vs_gpu_laya_v2": 14274.1,
+    "vram_reduction_mb": 831.39,
+    "status": "quarantined_deprecated_untested_on_locked_test"
+  },
+  "metrics": {
+    "train": {
+      "samples": 4000,
+      "source_groups": [
+        "2026-08-22",
+        "2026-09-12",
+        "2026-09-13"
+      ],
+      "route_accuracy_raw": 0.77075,
+      "route_accuracy_selected": 0.76225,
+      "mean_selected_utility": 0.06493321261176271,
+      "mean_selected_forecast_loss": 0.06209588273100235,
+      "mean_oracle_utility": 0.058840307982662356,
+      "mean_oracle_forecast_loss": 0.055168985390713715,
+      "mean_route_regret_vs_oracle": 0.00609290462910036,
+      "best_fixed_expert": "lstm_cse",
+      "best_fixed_utility": 0.06524527747791199,
+      "best_fixed_forecast_loss": 0.06259720684777859,
+      "utility_gain_over_best_fixed": 0.0003120648661492781,
+      "forecast_loss_delta_vs_best_fixed": -0.0005013241167762389,
+      "hierarchical_gain_95_ci": [
+        1.616424425280856e-05,
+        0.0009791268591387773
+      ],
+      "selection_rate": {
+        "cnn_cse": 0.03125,
+        "lstm_cse": 0.91525,
+        "gru_cse": 0.0535,
+        "tcn_cse": 0.0
+      },
+      "fallback_rate": 0.098,
+      "route_confidence_ece_15_bin": 3.1475000001904287e-07,
+      "abstain_calibration": {
+        "gold_abstain_rate": 0.27,
+        "predicted_abstain_rate_at_0_5": 0.24775,
+        "ece_15_bin": 0.05485181813404267,
+        "brier": 0.1120644800219408,
+        "auroc": 0.8993559741248098,
+        "selective_accuracy_when_active": 0.8002658690594882,
+        "selective_utility_when_active": 0.07629118574537806,
+        "selective_regret_when_active": 0.0061376438304762875,
+        "abstained_subset_oracle_ambiguity_rate": 0.7295660948536832
+      }
+    },
+    "calibration": {
+      "samples": 1000,
+      "source_groups": [
+        "2026-09-15",
+        "2026-09-16"
+      ],
+      "route_accuracy_raw": 0.73,
+      "route_accuracy_selected": 0.736,
+      "mean_selected_utility": 0.06346546639196751,
+      "mean_selected_forecast_loss": 0.06056581059267046,
+      "mean_oracle_utility": 0.05679281714181384,
+      "mean_oracle_forecast_loss": 0.05281659247732023,
+      "mean_route_regret_vs_oracle": 0.006672649250153664,
+      "best_fixed_expert": "lstm_cse",
+      "best_fixed_utility": 0.06497475983637178,
+      "best_fixed_forecast_loss": 0.06232668920623837,
+      "utility_gain_over_best_fixed": 0.0015092934444042722,
+      "forecast_loss_delta_vs_best_fixed": -0.0017608786135679122,
+      "hierarchical_gain_95_ci": null,
+      "selection_rate": {
+        "cnn_cse": 0.044,
+        "lstm_cse": 0.903,
+        "gru_cse": 0.053,
+        "tcn_cse": 0.0
+      },
+      "fallback_rate": 0.104,
+      "route_confidence_ece_15_bin": 0.07133701899999997,
+      "abstain_calibration": {
+        "gold_abstain_rate": 0.276,
+        "predicted_abstain_rate_at_0_5": 0.257,
+        "ece_15_bin": 0.07752823359436027,
+        "brier": 0.12250280267051515,
+        "auroc": 0.8829019537192729,
+        "selective_accuracy_when_active": 0.7927321668909825,
+        "selective_utility_when_active": 0.07414817494120167,
+        "selective_regret_when_active": 0.006575313049051348,
+        "abstained_subset_oracle_ambiguity_rate": 0.7120622568093385
+      }
+    },
+    "locked_test": {
+      "samples": 1000,
+      "source_groups": [
+        "2026-09-17",
+        "2026-09-19",
+        "2026-09-20"
+      ],
+      "route_accuracy_raw": 0.665,
+      "route_accuracy_selected": 0.67,
+      "mean_selected_utility": 0.07504354373808926,
+      "mean_selected_forecast_loss": 0.07194523826462683,
+      "mean_oracle_utility": 0.06637966684518602,
+      "mean_oracle_forecast_loss": 0.061948274289687105,
+      "mean_route_regret_vs_oracle": 0.00866387689290324,
+      "best_fixed_expert": "lstm_cse",
+      "best_fixed_utility": 0.07706700437618912,
+      "best_fixed_forecast_loss": 0.0744189337460557,
+      "utility_gain_over_best_fixed": 0.0020234606380998554,
+      "forecast_loss_delta_vs_best_fixed": -0.002473695481428867,
+      "hierarchical_gain_95_ci": [
+        0.0003633754240718129,
+        0.002976137035470955
+      ],
+      "selection_rate": {
+        "cnn_cse": 0.087,
+        "lstm_cse": 0.879,
+        "gru_cse": 0.034,
+        "tcn_cse": 0.0
+      },
+      "fallback_rate": 0.116,
+      "route_confidence_ece_15_bin": 0.09926430199999997,
+      "abstain_calibration": {
+        "gold_abstain_rate": 0.227,
+        "predicted_abstain_rate_at_0_5": 0.156,
+        "ece_15_bin": 0.07963394005065352,
+        "brier": 0.13720065396937092,
+        "auroc": 0.7388913267719452,
+        "selective_accuracy_when_active": 0.7002369668246445,
+        "selective_utility_when_active": 0.08207065326185514,
+        "selective_regret_when_active": 0.009111423676153757,
+        "abstained_subset_oracle_ambiguity_rate": 0.6923076923076923
+      },
+      "cpu_inference_latency_us": {
+        "median_us": 4.3,
+        "p95_us": 8.2,
+        "p99_us": 33.722999999999985,
+        "mean_us": 5.628100000000001,
+        "min_us": 3.5,
+        "max_us": 93.8
+      }
+    }
+  }
+}

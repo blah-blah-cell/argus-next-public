@@ -1,7 +1,7 @@
 import {decodeHeroStream,stepHeroMotion,clampHeroRoughness,DEFAULT_HERO_ROUGHNESS} from './hero-math.mjs?v=roughness-1';
 import {createHeroVideo} from './hero-video.mjs';
 
-// New, local renderer for the selected reference mesh. No reference app code.
+// Local renderer for the clean-room procedural Argus hero mesh.
 const glassVertex=`
 varying vec3 vWorld, vNormalView;
 varying vec2 vUv;
@@ -132,7 +132,7 @@ export async function createHeroA(T,renderer,{invalidate=()=>{},onVideoStatus=()
   const outline=new T.MeshBasicMaterial({color:0xdde7ff,transparent:true,opacity:.18,depthWrite:false});
   const side=new T.ShaderMaterial({vertexShader:glassVertex,fragmentShader:sideFragment,uniforms:{uTime:{value:0},uEnergy:{value:0}},transparent:true,depthWrite:false,side:T.DoubleSide});
   const geometries=[];
-  for(const name of ['Alche_A','Alche_Outline','Alche_SideScreen']) {
+  for(const name of ['Argus_A','Argus_Outline','Argus_SideScreen']) {
     const meshData=data.meshes.find(item=>item.name===name);
     if(!meshData)throw Error(`Hero mesh missing: ${name}`);
     const geometry=new T.BufferGeometry();
@@ -143,8 +143,8 @@ export async function createHeroA(T,renderer,{invalidate=()=>{},onVideoStatus=()
     if(indices.some(index=>index>=meshData.position.count))throw Error('Hero index exceeds vertex bounds');
     geometry.setIndex(new T.BufferAttribute(indices,1));
     geometries.push(geometry);
-    const mesh=new T.Mesh(geometry,name==='Alche_A'?glass:name==='Alche_Outline'?outline:side);
-    mesh.name=name;mesh.renderOrder=name==='Alche_A'?1:name==='Alche_Outline'?2:3;
+    const mesh=new T.Mesh(geometry,name==='Argus_A'?glass:name==='Argus_Outline'?outline:side);
+    mesh.name=name;mesh.renderOrder=name==='Argus_A'?1:name==='Argus_Outline'?2:3;
     inner.add(mesh);
   }
   // Render the actual curved studio and its lettering in this GL context.

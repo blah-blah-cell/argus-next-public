@@ -1,0 +1,525 @@
+{
+  "schema": "argus.iot23-ids-detection-bridge/v1",
+  "created_utc": "2026-11-26T18:15:58.506735+00:00",
+  "elapsed_seconds": 869.76,
+  "cic_ids_status": {
+    "local_raw_48gb_archives_staged": false,
+    "cic_ids2017_evaluated": false,
+    "cic_ids2018_raw_pcaps_evaluated": false,
+    "frozen_plan_path": "research\\ahem-v61-detection-bridge-plan.json",
+    "frozen_plan_sha256": "49fe6eb8b5e1ad498569a8c4b277aa3b8a042285c124b5c075578b0e15ea2c58",
+    "frozen_plan_untouched": true,
+    "note": "Full 48 GB AWS CIC-IDS2017/2018 raw PCAP archives are not staged locally; no CIC-IDS2017 metrics were fabricated or mocked."
+  },
+  "temp_pcaps_deleted_after_scoring": true,
+  "frozen_checkpoints_root": "argus-dev/vm-packs/ahem-v6-final-assets-5ed2b72",
+  "frozen_checkpoints": {
+    "20260906/ahem_v6_state_transition": {
+      "sha256": "0edff7f3be0045d82f6ae3e682393965a8942501102ed4fd2d84cdad5e56ad89",
+      "epoch": 48,
+      "best_epoch": 48,
+      "best_validation": 0.2146168053150177,
+      "training_binding_sha256": null
+    },
+    "20260906/flow_lane_lstm": {
+      "sha256": "58ea4e5bc50156504036492e7ad3a5a20d0959949771f05ee9c28dcb1cc52c8e",
+      "epoch": 8,
+      "best_epoch": 8,
+      "best_validation": 0.3650486171245575,
+      "training_binding_sha256": null
+    },
+    "20260907/ahem_v6_state_transition": {
+      "sha256": "04b0cc5ce778ac41c4ebab8887ee83b5bfee3287906eb3997dcdc248b0e4ed79",
+      "epoch": 48,
+      "best_epoch": 48,
+      "best_validation": 0.21966716647148132,
+      "training_binding_sha256": null
+    },
+    "20260907/flow_lane_lstm": {
+      "sha256": "458ff246a6d89046e2daa184dc8c70d201ada06d35b12287f54fae454452798f",
+      "epoch": 7,
+      "best_epoch": 7,
+      "best_validation": 0.3711279332637787,
+      "training_binding_sha256": null
+    },
+    "20260908/ahem_v6_state_transition": {
+      "sha256": "389b35bad8d69d83eff7e996c9480a0f249e3a42d1c39dc62c5765a0d61fd61b",
+      "epoch": 41,
+      "best_epoch": 41,
+      "best_validation": 0.22134198248386383,
+      "training_binding_sha256": null
+    },
+    "20260908/flow_lane_lstm": {
+      "sha256": "7c77e078c06e32fd66e7fd9bca5c181a2c57a92ac6b8376c1f686369fa748c8b",
+      "epoch": 8,
+      "best_epoch": 8,
+      "best_validation": 0.3686135411262512,
+      "training_binding_sha256": null
+    }
+  },
+  "streaming_contract": {
+    "horizon_packets": 10000,
+    "emit_warmup": false,
+    "ewma_alpha": 0.3,
+    "refractory_seconds": 60,
+    "benign_calibration_target_fa_per_hour": 1.0,
+    "probability_calibration": "3-fold chronological OOF scalar temperature on fit capture only"
+  },
+  "captures": {
+    "8-1": {
+      "scenario": "CTU-IoT-Malware-Capture-8-1",
+      "role": "malware_and_benign",
+      "pcap_bytes": 2098362,
+      "pcap_sha256": "80dcc2602519479ddcde889fa902fee19a76696630811452f8df38888af894f2",
+      "conn_bytes": 1431000,
+      "conn_sha256": "4877ca8f0f01902fbd18d28b7d06cb3d0be082355b7f2c8862c9deef1782eb8a",
+      "conn_url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-IoT-Malware-Capture-8-1/bro/conn.log.labeled",
+      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-IoT-Malware-Capture-8-1/2018-07-31-15-15-09-192.168.100.113.pcap",
+      "eligible_events": 2684,
+      "attack_events": 1668,
+      "benign_events": 1016,
+      "monitored_seconds": 86395.260731136,
+      "extraction_stats": {
+        "source_records": 23623,
+        "accepted_packets": 16677,
+        "warmup_packets": 9999,
+        "unsupported_packets": 6946,
+        "awaiting_same_flow_target": 1494,
+        "eligible_events": 2684,
+        "open_interval_excluded": 2500
+      }
+    },
+    "21-1": {
+      "scenario": "CTU-IoT-Malware-Capture-21-1",
+      "role": "malware_and_benign",
+      "pcap_bytes": 4063997,
+      "pcap_sha256": "40b6928cedcda03fe5ded8a9994ec007a6d784028f37cbc00bbe3a26a7893023",
+      "conn_bytes": 428943,
+      "conn_sha256": "b63db259aead078f50fc150aa97ace4d1f69576e1245334962759d978ce437eb",
+      "conn_url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-IoT-Malware-Capture-21-1/bro/conn.log.labeled",
+      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-IoT-Malware-Capture-21-1/2018-10-03-15-22-32-192.168.100.113.pcap",
+      "eligible_events": 27352,
+      "attack_events": 26575,
+      "benign_events": 777,
+      "monitored_seconds": 86396.506387968,
+      "extraction_stats": {
+        "source_records": 50277,
+        "accepted_packets": 41063,
+        "warmup_packets": 9999,
+        "unsupported_packets": 9214,
+        "awaiting_same_flow_target": 3514,
+        "eligible_events": 27352,
+        "open_interval_excluded": 198
+      }
+    },
+    "4-1": {
+      "scenario": "CTU-Honeypot-Capture-4-1",
+      "role": "benign_only",
+      "pcap_bytes": 4594492,
+      "pcap_sha256": "3fb775c0391b6ad313a3f7845e634a277b07c3f6377346c2486ba63e1c22e90c",
+      "conn_bytes": 61653,
+      "conn_sha256": "aebe40ea0e03b120265a5c7bc140dd9b0d3fe2fce65559e84776b7dd5360e71e",
+      "conn_url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-Honeypot-Capture-4-1/bro/conn.log.labeled",
+      "url": "https://mcfp.felk.cvut.cz/publicDatasets/IoT-23-Dataset/IndividualScenarios/CTU-Honeypot-Capture-4-1/2018-10-25-14-06-32-192.168.1.132.pcap.xz",
+      "compressed_bytes": 376840,
+      "compressed_sha256": "bc5a57306d9a5f614b09d9c0976f007667fee5b6de3427fbab094fa3084b9b64",
+      "eligible_events": 6503,
+      "attack_events": 0,
+      "benign_events": 6503,
+      "monitored_seconds": 78841.406694144,
+      "extraction_stats": {
+        "source_records": 21664,
+        "accepted_packets": 16921,
+        "warmup_packets": 9999,
+        "unsupported_packets": 4743,
+        "awaiting_same_flow_target": 418,
+        "eligible_events": 6503,
+        "label_unmatched": 1
+      }
+    }
+  },
+  "directions": {
+    "fit_8_1__cal_4_1__test_21_1": {
+      "direction": "fit_8_1__cal_4_1__test_21_1",
+      "fit_capture": "8-1",
+      "benign_calibration_capture": "4-1",
+      "test_capture": "21-1",
+      "fit_events": 2684,
+      "fit_attack_prevalence": 0.6214605067064084,
+      "calibration_events": 6503,
+      "test_events": 27352,
+      "test_attack_prevalence": 0.9715925709271717,
+      "test_monitored_hours": 23.999029552213333,
+      "arms": {
+        "base_logreg": {
+          "arm": "base_logreg",
+          "feature_dim": 14,
+          "pr_auc": 0.9992192118459066,
+          "roc_auc": 0.9732395263157257,
+          "fpr_at_95_tpr": 0.0,
+          "ece_15_bin": 0.046436279582041794,
+          "brier": 0.04448149907010498,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0
+        },
+        "base_hgb": {
+          "arm": "base_hgb",
+          "feature_dim": 14,
+          "pr_auc": 0.9786948927883911,
+          "roc_auc": 0.6278590860716919,
+          "fpr_at_95_tpr": 0.7065637065637066,
+          "ece_15_bin": 0.06792921906990353,
+          "brier": 0.06792921906990348,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0
+        },
+        "base_plus_ewma_residual": {
+          "arm": "base_plus_ewma_residual",
+          "feature_dim": 21,
+          "pr_auc": 0.9199149338714714,
+          "roc_auc": 0.14033781665014028,
+          "fpr_at_95_tpr": 0.9176319176319176,
+          "ece_15_bin": 0.8628488135130742,
+          "brier": 0.8599130099123399,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0
+        },
+        "base_plus_ahem_v61_residual": {
+          "arm": "base_plus_ahem_v61_residual",
+          "feature_dim": 21,
+          "pr_auc": 0.998246241741708,
+          "roc_auc": 0.9404437793525282,
+          "fpr_at_95_tpr": 0.7104247104247104,
+          "ece_15_bin": 0.07079978986727463,
+          "brier": 0.06949422919889554,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0,
+          "per_seed_pr_auc": [
+            0.995734794399745,
+            0.9996496160483418,
+            0.9998045293537609
+          ],
+          "per_seed_roc_auc": [
+            0.8996923304166954,
+            0.9883478317721028,
+            0.9934272129944756
+          ]
+        },
+        "base_plus_lstm_residual": {
+          "arm": "base_plus_lstm_residual",
+          "feature_dim": 21,
+          "pr_auc": 0.981668245303164,
+          "roc_auc": 0.8476498000486711,
+          "fpr_at_95_tpr": 0.1981981981981982,
+          "ece_15_bin": 0.1410692954135515,
+          "brier": 0.06059634714908435,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0,
+          "per_seed_pr_auc": [
+            0.9964595614723836,
+            0.9955224743325508,
+            0.9805431742896117
+          ],
+          "per_seed_roc_auc": [
+            0.9104202307400802,
+            0.8935444354447176,
+            0.7699427447875238
+          ]
+        },
+        "ahem_v61_state": {
+          "arm": "ahem_v61_state",
+          "feature_dim": 120,
+          "pr_auc": 0.9769400692623018,
+          "roc_auc": 0.7123142171872181,
+          "fpr_at_95_tpr": 0.38481338481338484,
+          "ece_15_bin": 0.02291508464262222,
+          "brier": 0.022472332539252515,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0,
+          "per_seed_pr_auc": [
+            0.9916089972207242,
+            0.9306635826653137,
+            0.9687490293565598
+          ],
+          "per_seed_roc_auc": [
+            0.8551726676279827,
+            0.1185387510881396,
+            0.4539630559197822
+          ]
+        },
+        "memory_disabled_state": {
+          "arm": "memory_disabled_state",
+          "feature_dim": 120,
+          "pr_auc": 0.9923052757556894,
+          "roc_auc": 0.8673903415577922,
+          "fpr_at_95_tpr": 0.2651222651222651,
+          "ece_15_bin": 0.020825087569045823,
+          "brier": 0.016929952924009405,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0,
+          "per_seed_pr_auc": [
+            0.9923070621110935,
+            0.9727642128738297,
+            0.9909005848993238
+          ],
+          "per_seed_roc_auc": [
+            0.8674220625678762,
+            0.5211994900423875,
+            0.8429613379001902
+          ]
+        },
+        "base_plus_ahem_v61_state": {
+          "arm": "base_plus_ahem_v61_state",
+          "feature_dim": 134,
+          "pr_auc": 0.981551495731155,
+          "roc_auc": 0.7599934862964026,
+          "fpr_at_95_tpr": 0.3075933075933076,
+          "ece_15_bin": 0.019712585665896183,
+          "brier": 0.019651090067316745,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0,
+          "per_seed_pr_auc": [
+            0.9923937995093407,
+            0.9259016400278339,
+            0.9702420353899883
+          ],
+          "per_seed_roc_auc": [
+            0.8686448469703408,
+            0.10790904060894653,
+            0.5287633285751818
+          ]
+        }
+      },
+      "deltas": {
+        "ahem_residual_minus_base_pr_auc": -0.0009729701041986116,
+        "ahem_residual_minus_ewma_pr_auc": 0.07833130787023657,
+        "ahem_residual_minus_lstm_pr_auc": 0.016577996438543963,
+        "ahem_state_minus_memory_disabled_pr_auc": -0.015365206493387573,
+        "ahem_state_minus_memory_disabled_roc_auc": -0.15507612437057405
+      }
+    },
+    "fit_21_1__cal_4_1__test_8_1": {
+      "direction": "fit_21_1__cal_4_1__test_8_1",
+      "fit_capture": "21-1",
+      "benign_calibration_capture": "4-1",
+      "test_capture": "8-1",
+      "fit_events": 27352,
+      "fit_attack_prevalence": 0.9715925709271717,
+      "calibration_events": 6503,
+      "test_events": 2684,
+      "test_attack_prevalence": 0.6214605067064084,
+      "test_monitored_hours": 23.998683536426668,
+      "arms": {
+        "base_logreg": {
+          "arm": "base_logreg",
+          "feature_dim": 14,
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "fpr_at_95_tpr": 0.0,
+          "ece_15_bin": 7.211309530101963e-43,
+          "brier": 6.953243532549236e-85,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0
+        },
+        "base_hgb": {
+          "arm": "base_hgb",
+          "feature_dim": 14,
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "fpr_at_95_tpr": 0.0,
+          "ece_15_bin": 9.634522937595411e-48,
+          "brier": 1.2260812131834643e-94,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0
+        },
+        "base_plus_ewma_residual": {
+          "arm": "base_plus_ewma_residual",
+          "feature_dim": 21,
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "fpr_at_95_tpr": 0.0,
+          "ece_15_bin": 2.0100592725970736e-45,
+          "brier": 5.398539594699243e-90,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0
+        },
+        "base_plus_ahem_v61_residual": {
+          "arm": "base_plus_ahem_v61_residual",
+          "feature_dim": 21,
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "fpr_at_95_tpr": 0.0,
+          "ece_15_bin": 5.850751747657231e-45,
+          "brier": 2.4733120858695397e-88,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0,
+          "per_seed_pr_auc": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "per_seed_roc_auc": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "base_plus_lstm_residual": {
+          "arm": "base_plus_lstm_residual",
+          "feature_dim": 21,
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "fpr_at_95_tpr": 0.0,
+          "ece_15_bin": 0.0,
+          "brier": 0.0,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0,
+          "per_seed_pr_auc": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "per_seed_roc_auc": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "ahem_v61_state": {
+          "arm": "ahem_v61_state",
+          "feature_dim": 120,
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "fpr_at_95_tpr": 0.0,
+          "ece_15_bin": 0.0036157944076725466,
+          "brier": 0.001000814458262129,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0,
+          "per_seed_pr_auc": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "per_seed_roc_auc": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "memory_disabled_state": {
+          "arm": "memory_disabled_state",
+          "feature_dim": 120,
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "fpr_at_95_tpr": 0.0,
+          "ece_15_bin": 0.005490973429243841,
+          "brier": 0.0005277454860622918,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0,
+          "per_seed_pr_auc": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "per_seed_roc_auc": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "base_plus_ahem_v61_state": {
+          "arm": "base_plus_ahem_v61_state",
+          "feature_dim": 134,
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "fpr_at_95_tpr": 0.0,
+          "ece_15_bin": 0.10540674980283368,
+          "brier": 0.03954840196673081,
+          "fa_per_hour": 0.0,
+          "false_alerts": 0,
+          "packet_recall_at_threshold": 0.0,
+          "operating_threshold": 1.0000000000000002,
+          "calibration_4_1_fa_per_hour": 0.0,
+          "calibration_4_1_false_alerts": 0,
+          "per_seed_pr_auc": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "per_seed_roc_auc": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      },
+      "deltas": {
+        "ahem_residual_minus_base_pr_auc": 0.0,
+        "ahem_residual_minus_ewma_pr_auc": 0.0,
+        "ahem_residual_minus_lstm_pr_auc": 0.0,
+        "ahem_state_minus_memory_disabled_pr_auc": 0.0,
+        "ahem_state_minus_memory_disabled_roc_auc": 0.0
+      }
+    }
+  }
+}

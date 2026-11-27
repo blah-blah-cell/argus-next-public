@@ -12,6 +12,7 @@ ignore = [
   { id = "RUSTSEC-2025-0081", reason = "unmaintained unic-char-property, transitive via tauri-utils" },
   { id = "RUSTSEC-2025-0098", reason = "unmaintained unic-ucd-version, transitive via tauri-utils" },
   { id = "RUSTSEC-2025-0100", reason = "unmaintained unic-ucd-ident, transitive via tauri-utils" },
+  { id = "RUSTSEC-2026-0543", reason = "unmaintained chrono 0.4.45 resolved only via inactive optional serde_with chrono_0_4 feature in Cargo.lock" },
 ]
 
 [bans]

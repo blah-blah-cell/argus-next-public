@@ -535,6 +535,26 @@
           <div class="diagnostics-grid" id="diagnostics-grid">
             <div class="empty-bars">Running local checks...</div>
           </div>
+          <div class="panel-heading">
+            <div><span>THIS COMPUTER · READ ONLY</span><h2>Applications and Windows Defender</h2></div>
+            <button type="button" class="button secondary" id="device-context-refresh">Refresh device context</button>
+          </div>
+          <p>Current Windows socket ownership, separate from captured traffic. Not an attribution of imported captures. UDP endpoints do not identify remote peers. No protection settings are changed.</p>
+          <div id="device-context-status" role="status" aria-live="polite">Refresh to read local application connections and Defender status.</div>
+          <div id="device-context-results"></div>
+          <label for="diagnostics-defender-mode">Defender connection</label>
+          <select id="diagnostics-defender-mode" aria-describedby="defender-control-help"><option value="off">Off</option><option value="read_only">Read-only</option><option value="controls">Read-only + scan/update controls</option></select>
+          <p id="defender-control-help">This is Argus access, not a switch for Windows protection. Controls require confirmation and Windows administrator approval for each action.</p>
+          <div id="defender-control-actions" hidden>
+            <button type="button" class="button secondary" data-defender-action="quick_scan">Quick scan…</button>
+            <button type="button" class="button secondary" data-defender-action="full_scan">Full scan…</button>
+            <button type="button" class="button secondary" data-defender-action="update_signatures">Update signatures…</button>
+          </div>
+          <p id="defender-action-status" role="status" aria-live="polite"></p>
+          <label><input type="checkbox" id="device-context-auto" /> Refresh device context every 10 seconds during live monitoring (this app session only)</label>
+          <h3>Application traffic · socket-match candidates</h3>
+          <p>Captured bytes are partial observations, not operating-system bandwidth counters. A matching socket is evidence of a possible owner, not proof of safety.</p>
+          <div id="device-context-activity" aria-live="polite">Start live monitoring and refresh device context to inspect candidate application traffic.</div>
         </section>
 
         <section class="panel alerts-panel" id="alerts" style="display: none;">
@@ -1129,6 +1149,14 @@
           <div class="onboarding-check pending"><span class="status-dot amber"></span><div><strong>Checking this device…</strong><small>Reading capture, storage, tool, and model status.</small></div></div>
         </div>
         <p class="onboarding-readiness-summary" id="onboarding-readiness-summary">Waiting for the runtime.</p>
+        <div class="onboarding-callout">
+          <strong>Connect Windows Defender</strong>
+          <p id="onboarding-defender-help">Optional. Choose Argus access—not Windows protection on/off. Scan/update controls ask for administrator approval separately for every action.</p>
+          <label for="onboarding-defender-mode">Defender connection</label>
+          <select id="onboarding-defender-mode" aria-describedby="onboarding-defender-help"><option value="off">Off</option><option value="read_only">Read-only</option><option value="controls">Read-only + scan/update controls</option></select>
+          <button class="button secondary" id="onboarding-defender-connect" type="button" aria-describedby="onboarding-defender-status">Refresh Defender status</button>
+          <p id="onboarding-defender-status" role="status" aria-live="polite">Loading your saved connection choice…</p>
+        </div>
       </div>
 
       <div class="onboarding-step" data-onboarding-step="2" tabindex="-1" role="region" aria-label="Monitoring preferences">
@@ -1227,6 +1255,10 @@
     </aside>
     <div class="scrim" id="scrim"></div>
     <script src="app.js?v=observatory-1"></script>
+    <dialog id="defender-action-confirm" aria-labelledby="defender-confirm-title" aria-describedby="defender-confirm-help">
+      <form method="dialog"><h2 id="defender-confirm-title">Confirm Defender action</h2><p id="defender-confirm-help">Windows will request administrator approval. A scan can remediate files under Defender's existing policy. Full scans can take a long time. Cancelling this dialog does nothing.</p><p id="defender-confirm-action"></p><button class="button secondary" value="cancel">Cancel</button><button class="button" value="confirm">Continue to Windows approval</button></form>
+    </dialog>
+    <script type="module" src="device-context.mjs"></script>
     <script type="module" src="traffic-explorer.mjs?v=1"></script>
     <script type="module" src="spatial/workspace.mjs?v=room-orbit-1"></script>
     <script type="module" src="network-xray.mjs?v=1"></script>

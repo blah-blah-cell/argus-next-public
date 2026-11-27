@@ -1,8 +1,65 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
 
+mod defender_control;
+mod device_context;
+mod native_preview;
 mod query_cache;
 mod replay_import;
+
+fn lower_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut result = String::with_capacity(bytes.len() * 2);
+    for &byte in bytes {
+        result.push(char::from(HEX[usize::from(byte >> 4)]));
+        result.push(char::from(HEX[usize::from(byte & 15)]));
+    }
+    result
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+async fn local_device_context(
+    preferences: tauri::State<'_, Arc<Mutex<RuntimePreferences>>>,
+) -> Result<serde_json::Value, String> {
+    let enabled = preferences
+        .lock()
+        .map_err(|_| "preferences unavailable")?
+        .defender_mode
+        != defender_control::DefenderMode::Off;
+    device_context::snapshot(enabled).await
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+fn set_defender_mode(
+    mode: defender_control::DefenderMode,
+    preferences: tauri::State<'_, Arc<Mutex<RuntimePreferences>>>,
+) -> Result<RuntimePreferences, String> {
+    let mut current = preferences.lock().map_err(|_| "preferences unavailable")?;
+    let mut updated = current.clone();
+    updated.defender_mode = mode;
+    persist_runtime_preferences(&updated)?;
+    *current = updated.clone();
+    Ok(updated)
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+async fn defender_action(
+    action: defender_control::DefenderAction,
+    preferences: tauri::State<'_, Arc<Mutex<RuntimePreferences>>>,
+) -> Result<(), String> {
+    if preferences
+        .lock()
+        .map_err(|_| "preferences unavailable")?
+        .defender_mode
+        != defender_control::DefenderMode::Controls
+    {
+        return Err("Defender controls are not enabled in Argus.".into());
+    }
+    defender_control::run(action).await
+}
 
 use std::{
     cmp::Reverse,
@@ -24,9 +81,15 @@ use argus_capture::{
 };
 use argus_core::{FlowInstanceId, TransportProtocol};
 use argus_detector::{AnomalyConfig, AnomalyRecord, AnomalySeverity, AnomalyTracker};
-use argus_inference::{FeedforwardTensorContract, OnnxFeedforwardForecaster};
+use argus_inference::{
+    AHEM_V61_SCHEMA_ID, AhemV61Expert, AhemV61TensorContract, FeedforwardTensorContract,
+    OnnxFeedforwardForecaster,
+    split_cell::{Forecast as SplitCellForecast, SplitCell},
+};
 use argus_nids::{FlowSummary, Pipeline, PipelineConfig, RunReport};
-use query_cache::{DossierStateFingerprint, IpcQueryCache, TopologyStateFingerprint};
+use query_cache::{
+    DossierStateFingerprint, IpcQueryCache, TOPOLOGY_CACHE_TTL, TopologyStateFingerprint,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{
@@ -192,6 +255,8 @@ struct RollingMonitor {
 #[serde(rename_all = "camelCase")]
 struct RuntimePreferences {
     version: u32,
+    #[serde(default)]
+    defender_mode: defender_control::DefenderMode,
     keep_monitoring_after_exit: bool,
     #[serde(default)]
     boost_mode: bool,
@@ -228,6 +293,7 @@ impl Default for RuntimePreferences {
     fn default() -> Self {
         Self {
             version: 1,
+            defender_mode: defender_control::DefenderMode::Off,
             keep_monitoring_after_exit: false,
             boost_mode: false,
             notification_policy: NotificationPolicy::default(),
@@ -1280,6 +1346,151 @@ impl Default for CnnWorker {
 #[derive(Default)]
 struct SimulationWorker(Arc<Mutex<CnnWorker>>);
 
+const LEGACY_PACKET_CAUSAL_CONTRACT: &str = "packet-causal-v1/next_global_packet";
+const LEGACY_PACKET_CAUSAL_SCHEMA: &str = "packet-causal-v1";
+const FLOW_V2_CONTRACT: &str = "packet-causal-flow-v2/next_same_flow_packet";
+const MAX_SPLIT_CELL_FLOWS: usize = 65_536;
+const SPLIT_CELL_MAX_DELAY_NS: u64 = 60_000_000_000;
+
+struct SplitCellFlowLane {
+    cell: SplitCell,
+    last_timestamp_ns: u64,
+    last_forecast: SplitCellForecast,
+    last_tick: u64,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SplitCellScore {
+    forecast_error: f64,
+    predicted_log_packet_length: f64,
+    observed_log_packet_length: f64,
+    predicted_log_interarrival: f64,
+    observed_log_interarrival: f64,
+}
+
+struct BoundedSplitCellTable {
+    lanes: HashMap<u64, SplitCellFlowLane>,
+    order: VecDeque<(u64, u64)>,
+    max_flows: usize,
+    tick: u64,
+    evicted_flows: u64,
+    forecasts_scored: u64,
+    last_score: Option<SplitCellScore>,
+}
+
+impl BoundedSplitCellTable {
+    fn with_capacity(max_flows: usize) -> Self {
+        Self {
+            lanes: HashMap::new(),
+            order: VecDeque::new(),
+            max_flows: max_flows.max(1),
+            tick: 0,
+            evicted_flows: 0,
+            forecasts_scored: 0,
+            last_score: None,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.lanes.clear();
+        self.order.clear();
+        self.tick = 0;
+        self.forecasts_scored = 0;
+        self.last_score = None;
+    }
+
+    fn active_flows(&self) -> usize {
+        self.lanes.len()
+    }
+
+    const fn evicted_flows(&self) -> u64 {
+        self.evicted_flows
+    }
+
+    const fn forecasts_scored(&self) -> u64 {
+        self.forecasts_scored
+    }
+
+    const fn last_score(&self) -> Option<SplitCellScore> {
+        self.last_score
+    }
+
+    #[allow(clippy::cast_precision_loss)]
+    fn observe_packet(
+        &mut self,
+        opaque_flow_id: u64,
+        monotonic_timestamp_ns: u64,
+        packet_length_bytes: u64,
+    ) {
+        self.tick = self.tick.wrapping_add(1);
+        let tick = self.tick;
+        let frame_bytes = u32::try_from(packet_length_bytes).unwrap_or(u32::MAX);
+
+        if let Some(lane) = self.lanes.get_mut(&opaque_flow_id) {
+            let gap_ns = monotonic_timestamp_ns.saturating_sub(lane.last_timestamp_ns);
+            let observed_log_len = f64::from(frame_bytes).ln_1p();
+            let observed_log_delay =
+                (gap_ns.min(SPLIT_CELL_MAX_DELAY_NS) as f64 / 1_000_000_000.0).ln_1p();
+            let previous = lane.last_forecast;
+            let len_err = smooth_l1_f64(previous.log_bytes, observed_log_len);
+            let time_err = smooth_l1_f64(previous.log_delay, observed_log_delay);
+            // Desktop diagnostic score uses unweighted 1:1 Smooth L1 midpoint to match
+            // legacy ONNX display (`smooth_l1_first_two_features`); offline benchmark
+            // reports use 1:4 weighted Smooth L1 `(len_err + 4 * time_err) / 5`.
+            self.last_score = Some(SplitCellScore {
+                forecast_error: len_err.midpoint(time_err),
+                predicted_log_packet_length: previous.log_bytes,
+                observed_log_packet_length: observed_log_len,
+                predicted_log_interarrival: previous.log_delay,
+                observed_log_interarrival: observed_log_delay,
+            });
+            self.forecasts_scored = self.forecasts_scored.saturating_add(1);
+            lane.last_forecast = lane.cell.observe_packet(frame_bytes, gap_ns);
+            lane.last_timestamp_ns = monotonic_timestamp_ns;
+            lane.last_tick = tick;
+        } else {
+            self.evict_if_full();
+            let mut cell = SplitCell::default();
+            let forecast = cell.observe_packet(frame_bytes, 0);
+            self.lanes.insert(
+                opaque_flow_id,
+                SplitCellFlowLane {
+                    cell,
+                    last_timestamp_ns: monotonic_timestamp_ns,
+                    last_forecast: forecast,
+                    last_tick: tick,
+                },
+            );
+        }
+
+        self.order.push_back((opaque_flow_id, tick));
+        if self.order.len() > self.max_flows.saturating_mul(2) {
+            let lanes = &self.lanes;
+            self.order.retain(|(flow_id, recorded_tick)| {
+                lanes
+                    .get(flow_id)
+                    .is_some_and(|lane| lane.last_tick == *recorded_tick)
+            });
+        }
+    }
+
+    fn evict_if_full(&mut self) {
+        while self.lanes.len() >= self.max_flows {
+            let Some((candidate_flow, recorded_tick)) = self.order.pop_front() else {
+                break;
+            };
+            if self
+                .lanes
+                .get(&candidate_flow)
+                .is_some_and(|lane| lane.last_tick == recorded_tick)
+            {
+                self.lanes.remove(&candidate_flow);
+                self.evicted_flows = self.evicted_flows.saturating_add(1);
+            }
+        }
+    }
+}
+
 struct NativeModel {
     name: &'static str,
     context_packets: usize,
@@ -1288,6 +1499,9 @@ struct NativeModel {
 
 struct NativeOnnxWorker {
     models: Vec<NativeModel>,
+    ahem_v61: Option<AhemV61Expert>,
+    split_cell: BoundedSplitCellTable,
+    split_cell_disabled: bool,
     rejected: HashMap<&'static str, String>,
     history: VecDeque<[f32; 12]>,
     history_scope: Option<String>,
@@ -1318,8 +1532,75 @@ impl NativeOnnxWorker {
         Self::load_selected(model_dir, &[])
     }
 
+    #[cfg(test)]
+    fn new_for_split_cell_test(max_flows: usize, split_cell_disabled: bool) -> Self {
+        Self {
+            models: Vec::new(),
+            ahem_v61: None,
+            split_cell: BoundedSplitCellTable::with_capacity(max_flows),
+            split_cell_disabled,
+            rejected: HashMap::from([(
+                "ahem_v61",
+                "ahem_v61.onnx and manifest are not present in model directory".to_owned(),
+            )]),
+            history: VecDeque::with_capacity(64),
+            history_scope: None,
+            last_timestamp_ns: None,
+        }
+    }
+
+    fn new_split_cell_only(
+        rejected: HashMap<&'static str, String>,
+        split_cell_disabled: bool,
+    ) -> Self {
+        Self {
+            models: Vec::new(),
+            ahem_v61: None,
+            split_cell: BoundedSplitCellTable::with_capacity(MAX_SPLIT_CELL_FLOWS),
+            split_cell_disabled,
+            rejected,
+            history: VecDeque::with_capacity(30_000),
+            history_scope: None,
+            last_timestamp_ns: None,
+        }
+    }
+
     fn load_selected(model_dir: &Path, disabled_models: &[String]) -> Result<Self, String> {
-        let runtime = discover_native_runtime_library()?;
+        let split_cell_disabled = disabled_models
+            .iter()
+            .any(|disabled| disabled == "split_cell_v1");
+        let ahem_v61_present = model_dir.join("ahem_v61.onnx").is_file()
+            || model_dir.join("ahem_v61.onnx.manifest.json").is_file();
+        match discover_native_runtime_library() {
+            Ok(runtime) => {
+                match Self::load_selected_with_runtime(model_dir, disabled_models, &runtime) {
+                    Ok(worker) => Ok(worker),
+                    Err(error) if !split_cell_disabled && !ahem_v61_present => Ok(
+                        Self::new_split_cell_only(HashMap::from([("onnx_models", error)]), false),
+                    ),
+                    Err(error) => Err(error),
+                }
+            }
+            Err(runtime_error) if !split_cell_disabled => Ok(Self::new_split_cell_only(
+                HashMap::from([
+                    ("onnxruntime", runtime_error),
+                    (
+                        "ahem_v61",
+                        "onnxruntime.dll is absent; running Rust-native split_cell_v1 only"
+                            .to_owned(),
+                    ),
+                ]),
+                false,
+            )),
+            Err(runtime_error) => Err(runtime_error),
+        }
+    }
+
+    fn load_selected_with_runtime(
+        model_dir: &Path,
+        disabled_models: &[String],
+        runtime: &Path,
+    ) -> Result<Self, String> {
         let mut models = Vec::new();
         let mut rejected = HashMap::new();
         for (name, stem, context_packets) in [
@@ -1334,7 +1615,7 @@ impl NativeOnnxWorker {
             let manifest_path = model_dir.join(format!("{stem}.onnx.manifest.json"));
             let loaded = argus_inference::read_manifest(&manifest_path).and_then(|manifest| {
                 OnnxFeedforwardForecaster::load(
-                    &runtime,
+                    runtime,
                     &model_path,
                     &manifest,
                     FeedforwardTensorContract {
@@ -1356,7 +1637,40 @@ impl NativeOnnxWorker {
                 }
             }
         }
-        if models.is_empty() {
+        // Optional fail-closed AHEM v6.1 ONNX admission (strictly decoupled from
+        // packet-causal-v1 models; never conflates v1 and flow-v2 features).
+        let ahem_v61 = if disabled_models
+            .iter()
+            .any(|disabled| disabled == "ahem_v61")
+        {
+            None
+        } else {
+            let model_path = model_dir.join("ahem_v61.onnx");
+            let manifest_path = model_dir.join("ahem_v61.onnx.manifest.json");
+            if model_path.is_file() || manifest_path.is_file() {
+                match argus_inference::read_manifest(&manifest_path).and_then(|manifest| {
+                    AhemV61Expert::load(
+                        runtime,
+                        &model_path,
+                        &manifest,
+                        AhemV61TensorContract::default(),
+                    )
+                }) {
+                    Ok(expert) => Some(expert),
+                    Err(error) => {
+                        rejected.insert("ahem_v61", error.to_string());
+                        None
+                    }
+                }
+            } else {
+                rejected.insert(
+                    "ahem_v61",
+                    "ahem_v61.onnx and manifest are not present in model directory".to_owned(),
+                );
+                None
+            }
+        };
+        if models.is_empty() && ahem_v61.is_none() {
             return Err(format!(
                 "no native ONNX model was admitted: {}",
                 rejected
@@ -1366,8 +1680,14 @@ impl NativeOnnxWorker {
                     .join("; ")
             ));
         }
+        let split_cell_disabled = disabled_models
+            .iter()
+            .any(|disabled| disabled == "split_cell_v1");
         Ok(Self {
             models,
+            ahem_v61,
+            split_cell: BoundedSplitCellTable::with_capacity(MAX_SPLIT_CELL_FLOWS),
+            split_cell_disabled,
             rejected,
             history: VecDeque::with_capacity(30_000),
             history_scope: None,
@@ -1390,6 +1710,7 @@ impl NativeOnnxWorker {
         let started = Instant::now();
         if self.history_scope.as_deref() != Some(history_scope) {
             self.history.clear();
+            self.split_cell.clear();
             self.last_timestamp_ns = None;
             self.history_scope = Some(history_scope.to_owned());
         }
@@ -1414,9 +1735,22 @@ impl NativeOnnxWorker {
             .is_some_and(|previous| rows[0].monotonic_timestamp_ns < previous)
         {
             self.history.clear();
+            self.split_cell.clear();
             self.last_timestamp_ns = None;
         }
+        let split_cell_started = Instant::now();
         for row in &rows {
+            // Per-flow packet-causal-flow-v2 path: tracks true per-opaque_flow_id
+            // interarrival and pre-arrival SplitCell scoring.
+            if !self.split_cell_disabled {
+                self.split_cell.observe_packet(
+                    row.opaque_flow_id,
+                    row.monotonic_timestamp_ns,
+                    row.packet_length_bytes,
+                );
+            }
+            // Legacy global-interarrival packet-causal-v1 path for cnn_local /
+            // ahem_fixed / tcn_long.
             let delta_seconds = self.last_timestamp_ns.map_or(0.0, |previous| {
                 std::time::Duration::from_nanos(
                     row.monotonic_timestamp_ns
@@ -1445,6 +1779,7 @@ impl NativeOnnxWorker {
                 self.history.pop_front();
             }
         }
+        let split_cell_elapsed_ms = split_cell_started.elapsed().as_secs_f64() * 1_000.0;
         let mut outputs = serde_json::Map::new();
         if predict {
             for model in &self.models {
@@ -1453,6 +1788,8 @@ impl NativeOnnxWorker {
                         model.name.to_owned(),
                         serde_json::json!({
                             "state": "skipped_by_router",
+                            "contract": LEGACY_PACKET_CAUSAL_CONTRACT,
+                            "feature_schema": LEGACY_PACKET_CAUSAL_SCHEMA,
                             "runtime_backend": "onnxruntime",
                             "execution_provider": model.forecaster.execution_provider(),
                         }),
@@ -1464,6 +1801,8 @@ impl NativeOnnxWorker {
                         model.name.to_owned(),
                         serde_json::json!({
                             "state": "warming_up",
+                            "contract": LEGACY_PACKET_CAUSAL_CONTRACT,
+                            "feature_schema": LEGACY_PACKET_CAUSAL_SCHEMA,
                             "context_packets": self.history.len().saturating_sub(1),
                             "runtime_backend": "onnxruntime",
                             "execution_provider": model.forecaster.execution_provider(),
@@ -1495,6 +1834,8 @@ impl NativeOnnxWorker {
                     model.name.to_owned(),
                     serde_json::json!({
                         "state": "forecast_only",
+                        "contract": LEGACY_PACKET_CAUSAL_CONTRACT,
+                        "feature_schema": LEGACY_PACKET_CAUSAL_SCHEMA,
                         "context_packets": model.context_packets,
                         "forecast_error": length_error.midpoint(time_error),
                         "loss_contract": "smooth_l1_first_two_features",
@@ -1509,14 +1850,76 @@ impl NativeOnnxWorker {
                     }),
                 );
             }
+            if !self.split_cell_disabled {
+                let entry = if let Some(score) = self.split_cell.last_score() {
+                    serde_json::json!({
+                        "state": "forecast_only",
+                        "contract": FLOW_V2_CONTRACT,
+                        "feature_schema": AHEM_V61_SCHEMA_ID,
+                        "runtime_backend": "rust-native",
+                        "execution_provider": "RustNativeCpu",
+                        "parameters": 0,
+                        "loss_contract": "smooth_l1_first_two_features",
+                        "forecast_error": score.forecast_error,
+                        "predicted_log_packet_length": score.predicted_log_packet_length,
+                        "observed_log_packet_length": score.observed_log_packet_length,
+                        "predicted_log_interarrival": score.predicted_log_interarrival,
+                        "observed_log_interarrival": score.observed_log_interarrival,
+                        "forecasts_scored": self.split_cell.forecasts_scored(),
+                        "active_flows": self.split_cell.active_flows(),
+                        "evicted_flows": self.split_cell.evicted_flows(),
+                        "execution_ms": split_cell_elapsed_ms,
+                    })
+                } else {
+                    serde_json::json!({
+                        "state": "warming_up",
+                        "contract": FLOW_V2_CONTRACT,
+                        "feature_schema": AHEM_V61_SCHEMA_ID,
+                        "runtime_backend": "rust-native",
+                        "execution_provider": "RustNativeCpu",
+                        "parameters": 0,
+                        "forecasts_scored": 0,
+                        "active_flows": self.split_cell.active_flows(),
+                        "evicted_flows": self.split_cell.evicted_flows(),
+                        "execution_ms": split_cell_elapsed_ms,
+                    })
+                };
+                outputs.insert("split_cell_v1".to_owned(), entry);
+            }
         }
+        let ahem_v61_native = match &self.ahem_v61 {
+            Some(expert) => serde_json::json!({
+                "state": "loaded_standby",
+                "contract": FLOW_V2_CONTRACT,
+                "feature_schema": AHEM_V61_SCHEMA_ID,
+                "model_id": expert.id(),
+                "runtime_backend": "onnxruntime",
+                "execution_provider": expert.execution_provider(),
+                "model_path": expert.model_path().file_name().and_then(|name| name.to_str()),
+                "detail": "AHEM v6.1 ONNX manifest and artifact validated in fail-closed standby (never fed packet-causal-v1 features); native split_cell_v1 runs live per packet.",
+            }),
+            None => serde_json::json!({
+                "state": "unavailable",
+                "contract": FLOW_V2_CONTRACT,
+                "feature_schema": AHEM_V61_SCHEMA_ID,
+                "detail": self
+                    .rejected
+                    .get("ahem_v61")
+                    .cloned()
+                    .unwrap_or_else(|| "disabled or artifact absent".to_owned()),
+            }),
+        };
+        let rust_only = self.models.is_empty() && self.ahem_v61.is_none();
         Ok(serde_json::json!({
             "state": "active",
-            "runtime_backend": "onnxruntime",
-            "execution_provider": "CPUExecutionProvider",
+            "runtime_backend": if rust_only { "rust-native" } else { "onnxruntime" },
+            "execution_provider": if rust_only { "RustNativeCpu" } else { "CPUExecutionProvider" },
             "models": outputs,
+            "ahem_v61_native": ahem_v61_native,
             "rejected_models": self.rejected,
             "history_packets": self.history.len(),
+            "split_cell_active_flows": self.split_cell.active_flows(),
+            "split_cell_evicted_flows": self.split_cell.evicted_flows(),
             "source_rows": rows.len(),
             "latest_source_capture_ordinal": rows.last().map(|row| row.source_capture_ordinal),
             "latest_opaque_flow_id": rows.last().map(|row| row.opaque_flow_id),
@@ -1534,7 +1937,43 @@ fn smooth_l1(prediction: f32, target: f32) -> f32 {
     }
 }
 
+fn smooth_l1_f64(prediction: f64, target: f64) -> f64 {
+    let difference = (prediction - target).abs();
+    if difference < 1.0 {
+        0.5 * difference * difference
+    } else {
+        difference - 0.5
+    }
+}
+
 impl CnnWorker {
+    fn infer_native_preview(
+        &mut self,
+        model_dir: &Path,
+        features: &Path,
+        history_scope: &str,
+        predict: bool,
+        boost_mode: bool,
+    ) -> Result<serde_json::Value, String> {
+        if boost_mode {
+            return Err("Boost requires Python and is unavailable in the native preview.".into());
+        }
+        if self.native.is_none() {
+            let root = native_preview::root()?;
+            self.native = Some(NativeOnnxWorker::load_selected_with_runtime(
+                model_dir,
+                &self.disabled_models,
+                &root.join("onnxruntime.dll"),
+            )?);
+        }
+        let native = self
+            .native
+            .as_mut()
+            .ok_or("native worker unavailable")?
+            .infer(features, history_scope, predict, None)?;
+        Ok(native_preview::response(native, &self.disabled_models))
+    }
+
     fn select_models(&mut self, disabled_models: &[String]) {
         if self.disabled_models != disabled_models {
             // Called only while holding the worker lock, never during an in-flight request.
@@ -1638,6 +2077,52 @@ impl CnnWorker {
         Ok(())
     }
 
+    fn infer_rust_native_fallback(
+        &mut self,
+        features: &Path,
+        history_scope: &str,
+        predict: bool,
+        request_started: Instant,
+        python_error: &str,
+    ) -> Result<serde_json::Value, String> {
+        let native_result = self
+            .native
+            .as_mut()
+            .ok_or_else(|| python_error.to_owned())?
+            .infer(features, history_scope, predict, None)?;
+        let total_ms = request_started.elapsed().as_secs_f64() * 1_000.0;
+        self.latency_samples_ms.push_back(total_ms);
+        while self.latency_samples_ms.len() > 256 {
+            self.latency_samples_ms.pop_front();
+        }
+        let models = native_result
+            .get("models")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
+        Ok(serde_json::json!({
+            "mode": "rust_native_split_cell_forecast_only",
+            "security_verdict": serde_json::Value::Null,
+            "calibrated": false,
+            "prediction_performed": predict,
+            "performance_mode": "balanced",
+            "execution_provider": native_result
+                .get("execution_provider")
+                .cloned()
+                .unwrap_or_else(|| serde_json::Value::String("RustNativeCpu".to_owned())),
+            "models": models,
+            "native_onnx": native_result,
+            "python_worker": {
+                "state": "unavailable",
+                "detail": python_error,
+            },
+            "runtime_latency": latency_summary(&self.latency_samples_ms),
+            "latency_breakdown": {
+                "total_ms": total_ms,
+            },
+        }))
+    }
+
+    #[allow(clippy::too_many_lines)]
     fn infer(
         &mut self,
         model_dir: &Path,
@@ -1648,13 +2133,33 @@ impl CnnWorker {
         boost_mode: bool,
     ) -> Result<serde_json::Value, String> {
         let request_started = Instant::now();
+        if native_preview::enabled()? {
+            return self.infer_native_preview(
+                model_dir,
+                features,
+                history_scope,
+                predict,
+                boost_mode,
+            );
+        }
         if boost_mode {
             // The Python CUDA path owns all compatible experts in boost mode;
             // the CPU-only native path would otherwise duplicate their work.
             self.native = None;
         }
         let worker_start = Instant::now();
-        self.ensure_started(model_dir, boost_mode)?;
+        if let Err(python_error) = self.ensure_started(model_dir, boost_mode) {
+            if !boost_mode && self.native.is_some() {
+                return self.infer_rust_native_fallback(
+                    features,
+                    history_scope,
+                    predict,
+                    request_started,
+                    &python_error,
+                );
+            }
+            return Err(python_error);
+        }
         let worker_start_ms = worker_start.elapsed().as_secs_f64() * 1_000.0;
         let ipc_started = Instant::now();
         let request = serde_json::json!({
@@ -1897,6 +2402,9 @@ struct ModelRuntime {
 }
 
 fn model_runtime() -> Result<ModelRuntime, String> {
+    if native_preview::enabled()? {
+        return Err("Python is disabled in the explicit native preview profile.".into());
+    }
     let source = if let Some(configured) = std::env::var_os("ARGUS_PYTHONPATH") {
         PathBuf::from(configured)
     } else {
@@ -2197,7 +2705,12 @@ fn desktop_status_blocking() -> DesktopStatus {
         |error| format!("optional native ONNX backend unavailable: {error}"),
         |path| format!("native ONNX Runtime candidate: {}", path.display()),
     );
-    let (model_backend, accelerator) = if admission.security_verdict_enabled {
+    let (model_backend, accelerator) = if native_preview::enabled().unwrap_or(false) {
+        (
+            "Native preview profile; legacy ONNX experts only. AHEM v6.1 and Python routing unavailable; check model telemetry for actual execution.".to_owned(),
+            Some("CPU (ONNX Runtime)".to_owned()),
+        )
+    } else if admission.security_verdict_enabled {
         ("calibrated security detector admitted".to_owned(), None)
     } else {
         match &runtime {
@@ -2454,7 +2967,17 @@ fn runtime_diagnostics_blocking() -> RuntimeDiagnostics {
         ),
     });
 
-    checks.push(match model_runtime() {
+    checks.push(if native_preview::enabled().unwrap_or(false) {
+        let loaded = native_preview::root().and_then(|root| {
+            NativeOnnxWorker::load_selected_with_runtime(&root.join("models"), &[], &root.join("onnxruntime.dll"))
+        });
+        match loaded {
+            Ok(worker) => diagnostic_ok("model-runtime", "Native preview runtime",
+                format!("Loaded {} legacy native experts. Python-backed AHEM v6.1 is unavailable in this preview.", worker.models.len())),
+            Err(error) => diagnostic_error("model-runtime", "Native preview runtime", error,
+                "Restore the complete native preview package; do not install Python as a substitute."),
+        }
+    } else { match model_runtime() {
         Ok(runtime) => diagnostic_ok(
             "model-runtime",
             "Local model worker",
@@ -2473,7 +2996,7 @@ fn runtime_diagnostics_blocking() -> RuntimeDiagnostics {
             error,
             "Set ARGUS_PYTHON to a valid PyTorch Python executable and ARGUS_PYTHONPATH to this repository's python/src directory.",
         ),
-    });
+    }});
 
     checks.push(match verify_ahem_v61_runtime_artifact(&model_directory()) {
         Ok(hash) => diagnostic_warning(
@@ -2727,7 +3250,7 @@ fn file_sha256(path: &Path) -> Result<String, std::io::Error> {
         }
         digest.update(&buffer[..count]);
     }
-    Ok(format!("{:x}", digest.finalize()))
+    Ok(lower_hex(digest.finalize().as_ref()))
 }
 
 fn external_tool_statuses() -> Vec<ExternalToolStatus> {
@@ -3418,6 +3941,13 @@ fn preferences_with_model_catalog(mut preferences: RuntimePreferences) -> Runtim
         .iter()
         .zip(files)
         .map(|(&id, file)| {
+            if native_preview::enabled().unwrap_or(false) {
+                let stem = match id { "cnn_local" => Some("cnn_local"), "ahem_fixed" => Some("ahem_fixed"), "tcn_long" => Some("tcn_long"), _ => None };
+                let available = stem.is_some_and(|stem| directory.join(format!("{stem}.onnx")).is_file());
+                return SelectableModel { id, available, detail: if available {
+                    "Native preview artifact present; execution is verified when a forecast runs."
+                } else { "Python-backed model unavailable in the explicit native preview; not substituted." } };
+            }
             let available = directory.join(file).is_file();
             SelectableModel {
                 id,
@@ -4199,6 +4729,11 @@ fn model_statuses(
 }
 
 fn model_directory() -> PathBuf {
+    if let Ok(root) = native_preview::root()
+        && native_preview::enabled_at(&root).unwrap_or(false)
+    {
+        return root.join("models");
+    }
     if let Some(configured) = std::env::var_os("ARGUS_MODEL_DIR") {
         return PathBuf::from(configured);
     }
@@ -4875,7 +5410,7 @@ fn reports_directory() -> Result<PathBuf, String> {
 fn sha256_bytes(contents: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(contents);
-    format!("{:x}", hasher.finalize())
+    lower_hex(hasher.finalize().as_ref())
 }
 
 fn encode_live_session_export(
@@ -5124,7 +5659,7 @@ async fn export_incident_report(
     md.push_str("## 4. Cryptographic Provenance & Chain of Custody\n\n");
     let mut hasher = Sha256::new();
     hasher.update(md.as_bytes());
-    let report_sha256 = format!("{:x}", hasher.finalize());
+    let report_sha256 = lower_hex(hasher.finalize().as_ref());
     let _ = writeln!(md, "- **Report Content SHA-256:** `{report_sha256}`");
     md.push_str("- **Fail-Closed Verification:** All calculations derived strictly from deterministic live memory with zero mock data.\n");
 
@@ -5574,11 +6109,10 @@ async fn get_network_topology(
     history: tauri::State<'_, Arc<Mutex<LiveHistory>>>,
     cache: tauri::State<'_, Arc<IpcQueryCache>>,
 ) -> Result<NetworkTopology, String> {
-    const TTL: Duration = Duration::from_secs(2);
     let (fingerprint, flows) = {
         let h = history.lock().map_err(|_| "LiveHistory lock poisoned")?;
         let fp = h.fingerprint();
-        if let Some(topo) = cache.get_topology(fp, TTL) {
+        if let Some(topo) = cache.get_topology(fp, TOPOLOGY_CACHE_TTL) {
             return Ok(topo);
         }
         (fp, h.view().map(|v| v.flows).unwrap_or_default())
@@ -5589,6 +6123,8 @@ async fn get_network_topology(
     Ok(topology)
 }
 
+static DOSSIER_SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 async fn generate_network_dossier(
@@ -5597,7 +6133,7 @@ async fn generate_network_dossier(
     cache: tauri::State<'_, Arc<IpcQueryCache>>,
 ) -> Result<DossierReportDto, String> {
     const TTL: Duration = Duration::from_secs(5);
-    let (fingerprint, flows, alert_items) = {
+    let (fingerprint, cached_dossier, flows, alert_items) = {
         let h = history.lock().map_err(|_| "LiveHistory lock poisoned")?;
         let a = alerts.lock().map_err(|_| "AlertManager lock poisoned")?;
         let fp = DossierStateFingerprint {
@@ -5606,48 +6142,81 @@ async fn generate_network_dossier(
             total_critical: a.total_critical,
             total_suspicious: a.total_suspicious,
         };
-        if let Some(dossier) = cache.get_dossier(fp, TTL)
-            && Path::new(&dossier.report_path).is_file()
-        {
+        let cached = cache.get_dossier(fp, TTL);
+        let flows = if cached.is_some() {
+            Vec::new()
+        } else {
+            h.view().map(|v| v.flows).unwrap_or_default()
+        };
+        let alert_items = if cached.is_some() {
+            Vec::new()
+        } else {
+            a.alerts.iter().cloned().collect::<Vec<_>>()
+        };
+        (fp, cached, flows, alert_items)
+    };
+
+    if let Some(dossier) = cached_dossier {
+        let report_path = dossier.report_path.clone();
+        let exists =
+            tauri::async_runtime::spawn_blocking(move || Path::new(&report_path).is_file())
+                .await
+                .map_err(|e| format!("dossier cache check task failed: {e}"))?;
+        if exists {
             return Ok(dossier);
         }
+    }
+
+    let (flows, alert_items) = if flows.is_empty() && alert_items.is_empty() {
+        let h = history.lock().map_err(|_| "LiveHistory lock poisoned")?;
+        let a = alerts.lock().map_err(|_| "AlertManager lock poisoned")?;
         (
-            fp,
             h.view().map(|v| v.flows).unwrap_or_default(),
             a.alerts.iter().cloned().collect::<Vec<_>>(),
         )
+    } else {
+        (flows, alert_items)
     };
-
-    let topology = build_topology_from_flows(&flows);
 
     let reports_dir = reports_directory()?;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs());
-    let report_id = format!("ARGUS-XRAY-{now}");
-    let report_file = reports_dir.join(format!("{report_id}.html"));
+    let dossier =
+        tauri::async_runtime::spawn_blocking(move || -> Result<DossierReportDto, String> {
+            let topology = build_topology_from_flows(&flows);
+            let duration = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default();
+            let now_secs = duration.as_secs();
+            let now_ms = duration.as_millis();
+            let seq = DOSSIER_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let report_id = format!("ARGUS-XRAY-{now_ms}-{seq}");
+            let report_file = reports_dir.join(format!("{report_id}.html"));
 
-    let html = format_network_dossier_html(&report_id, now, &topology, &flows, &alert_items);
+            let html =
+                format_network_dossier_html(&report_id, now_secs, &topology, &flows, &alert_items);
 
-    let mut hasher = Sha256::new();
-    hasher.update(html.as_bytes());
-    let sha256_hash = format!("{:x}", hasher.finalize());
+            let mut hasher = Sha256::new();
+            hasher.update(html.as_bytes());
+            let sha256_hash = lower_hex(hasher.finalize().as_ref());
 
-    fs::write(&report_file, &html).map_err(|e| e.to_string())?;
+            fs::write(&report_file, &html).map_err(|e| e.to_string())?;
 
-    let dossier = DossierReportDto {
-        report_id,
-        generated_at: format!("{now}"),
-        report_path: report_file.to_string_lossy().into_owned(),
-        sha256_hash,
-        total_nodes: topology.nodes.len(),
-        total_edges: topology.edges.len(),
-        total_bytes: topology.total_bytes,
-        total_packets: topology.total_packets,
-        tor_nodes_count: topology.tor_nodes_count,
-        malicious_nodes_count: topology.malicious_nodes_count,
-        html_content: html,
-    };
+            Ok(DossierReportDto {
+                report_id,
+                generated_at: format!("{now_secs}"),
+                report_path: report_file.to_string_lossy().into_owned(),
+                sha256_hash,
+                total_nodes: topology.nodes.len(),
+                total_edges: topology.edges.len(),
+                total_bytes: topology.total_bytes,
+                total_packets: topology.total_packets,
+                tor_nodes_count: topology.tor_nodes_count,
+                malicious_nodes_count: topology.malicious_nodes_count,
+                html_content: html,
+            })
+        })
+        .await
+        .map_err(|e| format!("dossier generation task failed: {e}"))??;
+
     cache.set_dossier(fingerprint, dossier.clone());
     Ok(dossier)
 }
@@ -6069,7 +6638,7 @@ fn ensure_desktop_shortcut() -> Result<(), String> {
         dunce::canonicalize(std::env::current_exe().map_err(|error| error.to_string())?)
             .map_err(|error| error.to_string())?;
     let icon_bytes = include_bytes!("../icons/icon.ico");
-    let icon_hash = format!("{:x}", Sha256::digest(icon_bytes));
+    let icon_hash = lower_hex(Sha256::digest(icon_bytes).as_ref());
     let local_root = std::env::var_os("LOCALAPPDATA")
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
@@ -6144,6 +6713,8 @@ fn exit_after_sensor_install_if_requested() {
 
 #[allow(clippy::too_many_lines)]
 fn main() {
+    native_preview::exit_if_check_requested();
+    defender_control::exit_if_helper();
     std::panic::set_hook(Box::new(|info| {
         let msg = format!("ARGUS PANIC: {info}\n");
         eprintln!("{msg}");
@@ -6201,6 +6772,9 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            local_device_context,
+            set_defender_mode,
+            defender_action,
             desktop_status,
             runtime_diagnostics,
             recent_captures,
@@ -6276,6 +6850,14 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn sha256_format_is_stable_across_digest_dependency_updates() {
+        use sha2::{Digest, Sha256};
+        assert_eq!(
+            super::lower_hex(Sha256::digest(b"abc").as_ref()),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
     #[test]
     fn test_storage_roots_are_process_local_and_never_use_operator_state() {
         let root = super::development_root().expect("isolated test root");
@@ -7704,6 +8286,190 @@ mod tests {
     }
 
     #[test]
+    fn bounded_split_cell_table_tracks_per_flow_interarrival_and_evicts_lru() {
+        let mut table = super::BoundedSplitCellTable::with_capacity(2);
+        // Flow 1 at t=1s (cold)
+        table.observe_packet(1, 1_000_000_000, 100);
+        assert_eq!(table.forecasts_scored(), 0);
+        assert_eq!(table.active_flows(), 1);
+        // Flow 2 at t=10s (interleaved, should NOT affect flow 1's per-flow gap!)
+        table.observe_packet(2, 10_000_000_000, 1500);
+        assert_eq!(table.forecasts_scored(), 0);
+        assert_eq!(table.active_flows(), 2);
+        // Flow 1 second packet at t=11s -> per-flow gap is 10s (NOT 1s global gap!)
+        table.observe_packet(1, 11_000_000_000, 100);
+        assert_eq!(table.forecasts_scored(), 1);
+        let score = table.last_score().expect("scored flow 1 transition");
+        let expected_log_delay = 10.0_f64.ln_1p();
+        assert!(
+            (score.observed_log_interarrival - expected_log_delay).abs() < 1e-6,
+            "expected per-flow 10s delay {}, got {}",
+            expected_log_delay,
+            score.observed_log_interarrival
+        );
+        // Flow 3 evicts LRU flow 2 (since flow 1 was just touched)
+        table.observe_packet(3, 12_000_000_000, 512);
+        assert_eq!(table.active_flows(), 2);
+        assert_eq!(table.evicted_flows(), 1);
+    }
+
+    #[test]
+    fn native_onnx_worker_infer_emits_decoupled_flow_v2_split_cell_and_ahem_v61_status() {
+        let dir =
+            std::env::temp_dir().join(format!("argus-split-cell-infer-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create temp dir");
+        let csv_path = dir.join("features.csv");
+        let header = "schema_id,schema_version,source_capture_ordinal,monotonic_timestamp_ns,opaque_flow_id,ip_version,transport_protocol,tcp_syn,tcp_ack,tcp_fin,tcp_rst,tcp_push,tcp_urg,packet_length_bytes\n";
+        let body = concat!(
+            "argus.causal-flow,1,0,1000000000,1,4,tcp,1,0,0,0,0,0,100\n",
+            "argus.causal-flow,1,1,10000000000,2,4,udp,0,0,0,0,0,0,1500\n",
+            "argus.causal-flow,1,2,11000000000,1,4,tcp,0,1,0,0,0,0,100\n"
+        );
+        fs::write(&csv_path, format!("{header}{body}")).expect("write features csv");
+
+        let mut worker = NativeOnnxWorker::new_for_split_cell_test(16, false);
+        let result = worker
+            .infer(&csv_path, "scope-a", true, None)
+            .expect("infer succeeds");
+        let split_cell = &result["models"]["split_cell_v1"];
+        assert_eq!(split_cell["state"], "forecast_only");
+        assert_eq!(split_cell["contract"], super::FLOW_V2_CONTRACT);
+        assert_eq!(split_cell["feature_schema"], super::AHEM_V61_SCHEMA_ID);
+        assert_eq!(split_cell["runtime_backend"], "rust-native");
+        assert_eq!(split_cell["parameters"], 0);
+        assert_eq!(split_cell["forecasts_scored"], 1);
+        assert_eq!(split_cell["active_flows"], 2);
+        let observed_delay = split_cell["observed_log_interarrival"]
+            .as_f64()
+            .expect("observed delay");
+        assert!(
+            (observed_delay - 10.0_f64.ln_1p()).abs() < 1e-6,
+            "expected per-flow 10s delay, got {observed_delay}"
+        );
+
+        // Explicit contract separation between legacy v1 and flow-v2.
+        assert_ne!(
+            super::LEGACY_PACKET_CAUSAL_CONTRACT,
+            super::FLOW_V2_CONTRACT
+        );
+        assert_ne!(
+            super::LEGACY_PACKET_CAUSAL_SCHEMA,
+            super::AHEM_V61_SCHEMA_ID
+        );
+        assert_eq!(result["ahem_v61_native"]["state"], "unavailable");
+        assert_eq!(
+            result["ahem_v61_native"]["contract"],
+            super::FLOW_V2_CONTRACT
+        );
+        assert_eq!(
+            result["ahem_v61_native"]["feature_schema"],
+            super::AHEM_V61_SCHEMA_ID
+        );
+
+        // Scope change resets SplitCell and history cleanly.
+        let single_row_csv = dir.join("single.csv");
+        fs::write(
+            &single_row_csv,
+            format!("{header}argus.causal-flow,1,0,500000000,1,4,tcp,1,0,0,0,0,0,120\n"),
+        )
+        .expect("write single row csv");
+        let reset_scope = worker
+            .infer(&single_row_csv, "scope-b", true, None)
+            .expect("scope reset infer");
+        assert_eq!(
+            reset_scope["models"]["split_cell_v1"]["state"],
+            "warming_up"
+        );
+        assert_eq!(
+            reset_scope["models"]["split_cell_v1"]["forecasts_scored"],
+            0
+        );
+
+        // Clock rollback within the same scope also resets SplitCell state.
+        let rollback_csv = dir.join("rollback.csv");
+        fs::write(
+            &rollback_csv,
+            format!("{header}argus.causal-flow,1,0,100000000,1,4,tcp,1,0,0,0,0,0,120\n"),
+        )
+        .expect("write rollback csv");
+        let after_rollback = worker
+            .infer(&rollback_csv, "scope-b", true, None)
+            .expect("rollback infer");
+        assert_eq!(
+            after_rollback["models"]["split_cell_v1"]["state"],
+            "warming_up"
+        );
+        assert_eq!(
+            after_rollback["models"]["split_cell_v1"]["forecasts_scored"],
+            0
+        );
+
+        // Disabling split_cell_v1 omits it from models output.
+        let mut disabled_worker = NativeOnnxWorker::new_for_split_cell_test(16, true);
+        let disabled_res = disabled_worker
+            .infer(&csv_path, "scope-a", true, None)
+            .expect("disabled infer");
+        assert!(disabled_res["models"].get("split_cell_v1").is_none());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn native_onnx_worker_fails_closed_on_malformed_ahem_v61_artifact() {
+        let dir =
+            std::env::temp_dir().join(format!("argus-ahem-v61-fail-closed-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create temp model dir");
+        fs::write(dir.join("ahem_v61.onnx"), b"not-a-valid-onnx-model").expect("write dummy onnx");
+        fs::write(dir.join("ahem_v61.onnx.manifest.json"), b"{invalid json")
+            .expect("write malformed manifest");
+
+        let error = NativeOnnxWorker::load_selected_with_runtime(
+            &dir,
+            &[],
+            std::path::Path::new("nonexistent-onnxruntime.dll"),
+        )
+        .err()
+        .expect("must fail closed when all artifacts are invalid");
+        assert!(
+            error.contains("no native ONNX model was admitted"),
+            "unexpected error: {error}"
+        );
+        assert!(error.contains("ahem_v61"), "unexpected error: {error}");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn native_onnx_worker_runs_split_cell_without_onnx_runtime_or_models() {
+        let dir =
+            std::env::temp_dir().join(format!("argus-split-cell-no-onnx-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create empty model dir");
+        let csv_path = dir.join("features.csv");
+        let header = "schema_id,schema_version,source_capture_ordinal,monotonic_timestamp_ns,opaque_flow_id,ip_version,transport_protocol,tcp_syn,tcp_ack,tcp_fin,tcp_rst,tcp_push,tcp_urg,packet_length_bytes\n";
+        let body = concat!(
+            "argus.causal-flow,1,0,1000000000,7,4,tcp,1,0,0,0,0,0,128\n",
+            "argus.causal-flow,1,1,2000000000,7,4,tcp,0,1,0,0,0,0,256\n"
+        );
+        fs::write(&csv_path, format!("{header}{body}")).expect("write features csv");
+
+        let mut worker = NativeOnnxWorker::load_selected(&dir, &[])
+            .expect("split_cell_v1 must initialize without onnxruntime.dll or ONNX models");
+        let result = worker
+            .infer(&csv_path, "weightless-scope", true, None)
+            .expect("split_cell_v1 infer succeeds without ONNX");
+        assert_eq!(result["runtime_backend"], "rust-native");
+        assert_eq!(result["execution_provider"], "RustNativeCpu");
+        assert_eq!(result["models"]["split_cell_v1"]["state"], "forecast_only");
+        assert_eq!(result["models"]["split_cell_v1"]["forecasts_scored"], 1);
+        assert_eq!(result["models"]["split_cell_v1"]["parameters"], 0);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     #[ignore = "requires ARGUS_ONNX_RUNTIME, ARGUS_ONNX_MODELS_DIR, and ARGUS_ONNX_FEATURES"]
     fn native_onnx_desktop_path_runs_real_features() {
         let models = std::env::var_os("ARGUS_ONNX_MODELS_DIR")
@@ -7719,9 +8485,30 @@ mod tests {
         assert_eq!(result["state"], "active");
         assert_eq!(result["models"]["cnn_local"]["state"], "forecast_only");
         assert_eq!(
+            result["models"]["cnn_local"]["contract"],
+            super::LEGACY_PACKET_CAUSAL_CONTRACT
+        );
+        assert_eq!(
+            result["models"]["cnn_local"]["feature_schema"],
+            super::LEGACY_PACKET_CAUSAL_SCHEMA
+        );
+        assert_eq!(
             result["models"]["cnn_local"]["runtime_backend"],
             "onnxruntime"
         );
+        assert_eq!(
+            result["models"]["split_cell_v1"]["contract"],
+            super::FLOW_V2_CONTRACT
+        );
+        assert_eq!(
+            result["models"]["split_cell_v1"]["feature_schema"],
+            super::AHEM_V61_SCHEMA_ID
+        );
+        assert_eq!(
+            result["models"]["split_cell_v1"]["runtime_backend"],
+            "rust-native"
+        );
+        assert_eq!(result["models"]["split_cell_v1"]["parameters"], 0);
     }
 
     #[test]

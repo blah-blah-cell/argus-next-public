@@ -5,11 +5,15 @@ without a dedicated security team. It is deliberately conservative: nothing here
 is claimed as done until it has been built, tested on a clean machine, and
 shipped with an artifact you can verify.
 
-The Windows setup program is already shipped, and the repository now carries an
-engineering baseline: a pinned toolchain, CI gates for formatting, clippy, tests,
-UI validation and release metadata, dependency/license/source policy, secret
-scanning, and tag-driven releases with checksums, an SBOM and build provenance.
-Those are recorded in `docs/adr/`. Everything else below is still ahead.
+The Windows setup program is already shipped, and the repository carries a
+verified engineering baseline: a pinned toolchain, CI gates for formatting,
+clippy, Rust and installer tests, clean-room procedural desktop UI validation
+(`180` checks), release metadata consistency, dependency/license/source policy,
+secret scanning, bounded `65,536`-flow capture/identity tracking with `FIN`/`RST`
+and idle eviction, a unit-tested `argus-capture` IPv6/IPv4 CIDR filter library
+module, a `6 s` topology cache TTL, and tag-driven releases with checksums, an
+SBOM and build provenance. Those are recorded in `docs/adr/`. Everything else
+below is still ahead.
 
 ## Guiding constraints
 
@@ -23,14 +27,15 @@ Those are recorded in `docs/adr/`. Everything else below is still ahead.
 - Forecasts are research outputs, not validated attack detections.
 - A prototype that quietly overstates itself is worse than a small honest tool.
 
-## Phase 0 — Trust and supply chain (in progress)
+## Stage 0 — Trust and supply chain (in progress)
 
 Delivered: root `LICENSE` (Apache-2.0) with model weights covered by a separate
-notice, `SECURITY.md` with scope and response windows, a `NOTICE` file, ADRs,
-and CI gates for formatting, clippy, Rust and installer tests, UI validation,
-release isolation, version/license consistency, dependency and license policy,
-and secret scanning. The release workflow now produces SHA-256 manifests, a
-CycloneDX SBOM and build provenance, with a guarded Authenticode step.
+notice, `SECURITY.md` with scope and response windows, a `NOTICE` file, clean-room
+procedural spatial UI assets (`Apache-2.0` / `CC0-1.0`), ADRs, and CI gates for
+formatting, clippy, Rust and installer tests, UI validation, release isolation,
+version/license consistency, dependency and license policy, and secret scanning.
+The release workflow produces SHA-256 manifests, a CycloneDX SBOM and build
+provenance, with a guarded Authenticode step.
 
 Remaining before pilot conversations:
 
@@ -45,54 +50,70 @@ Remaining before pilot conversations:
 Exit criteria: a stranger can download a release, verify hashes, read the
 license, and report a vulnerability without asking a question.
 
-## Phase 1 — Safe single-machine evaluation (next)
+## Stage 1 — Safe single-machine evaluation (in progress)
 
 Start with an authorized, known capture or explicitly generated test traffic;
 do not require an organization to expose normal network traffic. Make replay
 results distinguish observed flows, unsupported or skipped data, and the
-reasons behind any alert. Confirm what files are written, where they live, and
-what a user must do to remove them. Add bounded retention and privacy controls
-only with tests that verify actual behavior; do not label live capture
-metadata-only until the implementation makes that true.
+reasons behind any alert.
 
-Development implementation: the desktop now has a native PCAP/PCAPNG picker,
-offline source labeling, replay-local rules, capture-quality evidence and
-read-only flow inspection. Replay does not run forecasting automatically.
-This work has not been packaged in alpha.3. Native picker interaction and
-clean-machine end-to-end usability still need verification; tests and browser
-fixtures do not establish those outcomes. Low-disk protection is best effort,
-not a complete hard quota or metadata-only capture mode.
+Delivered in source:
+- Native PCAP/PCAPNG picker, offline source labeling, replay-local rules,
+  capture-quality evidence and read-only flow inspection.
+- Bounded `65,536`-flow `FlowGenerationTracker` and `PcapReplaySource` with
+  TCP `FIN`/`RST` closure eviction and `60 s` idle-timeout eviction, plus the
+  unit-tested `argus-capture` `PacketFilter` library module (`filter.rs`, bare
+  and keyed IPv6/IPv4 CIDR parsing and exact BPF lowering).
+- `get_network_topology` cache TTL (`6 s`) aligned above the `5,000 ms` UI poll
+  interval, and strict `packet-causal-v1` vs `packet-causal-flow-v2` feature
+  contract separation.
 
-Measure setup, idle and monitoring CPU/RAM, storage growth, and interruption
-recovery on identified Windows machines. A repeated run on one PC is not an
-independent site. Use labeled or controlled traffic when assessing alerts;
-report misses, false alerts, and unsupported cases as well as successes. A
-forecast-loss improvement is not an intrusion-detection result.
+Remaining:
+- Package the post-alpha.3 updates in a fresh signed installer and verify on a
+  clean Windows machine.
+- Wire `argus-capture::PacketFilter` into an operator-facing UI filter bar if
+  pilot workflows require interactive query filtering.
+- Measure setup, idle and monitoring CPU/RAM, storage growth, and interruption
+  recovery on identified Windows machines. Add hard storage quotas and true
+  metadata-only capture mode before claiming hard retention caps.
 
 Exit criteria: a reviewer can replay an authorized capture without starting
 live monitoring, see what was processed or omitted and why, and understand the
-files created and the limitations. Privacy controls and resource measurements
-must be verified, not inferred from defaults.
+files created and the limitations.
 
-## Phase 2 — Installed app without Python (planned)
+## Stage 2 — Installed app without Python (native runtime delivered; neural runtime optional)
 
-The installed app currently launches without a model runtime. Closing that gap
-removes the largest remaining install friction.
+Delivered in source (`scripts/package-windows.ps1` and `scripts/build-windows-release.ps1`):
+- **Separated release & weightless packaging:** The CI/GitHub Release bundle
+  (`scripts/package-windows.ps1`) ships the native binaries alongside frozen
+  `AHEM-v6.1` research weights and Python sources (no Python venv or
+  `onnxruntime.dll` included), while `scripts/build-windows-release.ps1`
+  produces an optional weightless portable build (binaries, sensor script,
+  launcher, README, and Apache-2.0/Three.js notices only; `-IncludeModels` opts
+  into bundling Python sources and `models/`).
+- **Native zero-parameter predictor & right-sized router:** Rust `split_cell_v1`
+  runs live per packet even without `onnxruntime.dll`, ONNX checkpoints, or
+  Python (`25.6 ns` batch-mean p50 at 4,096 lanes; `55.1 ns` at 65,536 lanes
+  under L3 spill; `ewma` `15.9 / 25.7 ns`; `earned_v1` `27.9 / 73.1 ns`) and
+  beats frozen `AHEM-v6.1` (`3.225 ms` PyTorch CPU p50; `15.2 us` native ctypes)
+  across all tested zero-shot datasets. `ahem_v61` in `NativeOnnxWorker` stays
+  in fail-closed ONNX manifest/artifact validation standby (never fed
+  `packet-causal-v1` features). A SHA-256-pinned `4,591 B` pure-JSON
+  `compact-router-v1` (`research/evidence/compact-router-v1.json`, `4.3 us`
+  head-only CPU median, `0.97 ms` end-to-end pure-Python `route_window()`,
+  wired into `compact_router.py`) replaces the quarantined 421M fp16 `Laya v2`
+  router (never evaluated on the locked test split).
 
-- Ship `onnxruntime.dll` and the v6.1 ONNX export beside the executable; the
-  `argus-inference` crate already fails closed when artifacts or runtime are
-  absent.
-- Verify ONNX parity in CI against the PyTorch checkpoint, including a
-  significant-error bound, before the runtime is trusted.
-- Keep PyTorch and the Python worker as research-only tooling, documented
-  separately, so end users never install `uv`, Python, or torch.
-- Add a model-readiness panel that states plainly which artifacts loaded and why
-  forecasting is or is not available.
+Remaining if optional ONNX neural forecasting is shipped:
+- Ship `onnxruntime.dll` and verified ONNX exports beside the executable only if
+  a downstream task justifies the latency/complexity over `split_cell_v1`.
+- Keep PyTorch and the Python worker as research-only tooling so end users never
+  install `uv`, Python, or torch.
 
-Exit criteria: a fresh install forecasts on a machine with no Python, and the
-app explains its own readiness truthfully.
+Exit criteria: a fresh install runs bounded telemetry and `split_cell_v1`
+without Python, and explains model readiness truthfully.
 
-## Phase 3 — Survivable unattended operation (planned)
+## Stage 3 — Survivable unattended operation (planned)
 
 - Tiered retention with hard quotas across raw captures, flows, alerts, and
   generated reports. Exported reports currently have no visible rotation.
@@ -109,7 +130,7 @@ app explains its own readiness truthfully.
 Exit criteria: a site runs for 30 days without filling a disk, without manual
 restarts, and with alerts reaching someone who is not staring at the dashboard.
 
-## Phase 4 — More than one site (gated on two successful pilots)
+## Stage 4 — More than one site (gated on two successful pilots)
 
 - `argus-sensor`: headless capture service sharing the current capture core.
 - `argus-collector`: single binary plus database, metadata-first ingestion,
@@ -121,7 +142,7 @@ restarts, and with alerts reaching someone who is not staring at the dashboard.
 Exit criteria: two sites report to one collector and one search view; a sensor
 offline for an hour loses nothing beyond configured policy.
 
-## Phase 5 — Scale and interoperability (ongoing)
+## Stage 5 — Scale and interoperability (ongoing)
 
 - Columnar archives (Parquet/DuckDB) for long retention and fast queries.
 - Ingestion of NetFlow/IPFIX and Zeek or Suricata logs for organizations that
@@ -131,24 +152,35 @@ offline for an hour loses nothing beyond configured policy.
   regression thresholds.
 - Linux sensor first, then macOS.
 
-## Cross-cutting workstreams
+## Cross-cutting tracks
 
-- **Accessibility and low-spec:** CPU-only inference, 4 GB RAM target, keyboard
-  navigation, high contrast, reduced motion (already supported in the UI).
-- **Privacy and compliance:** data-flow diagram, DPIA and DPA templates,
-  redaction rules, hash-only evidence export with chain-of-custody notes.
-- **Documentation:** a 15-minute administrator quickstart distinct from the
-  developer build guide, a deployment checklist, and troubleshooting by symptom.
-- **Evaluation:** replay harness with labeled captures, published precision and
-  false-positive budget, and per-site baselines before any detection claim.
-- **Localization:** defer until pilots request it; keep strings externalizable.
+### Local device context extension (implemented in source, not released)
+
+- Read-only Windows socket ownership and Defender status/history, refreshed on
+  demand with optional session-only refresh during explicit live monitoring.
+- Time-bounded TCP socket-match candidates and captured-byte summaries for the
+  latest live capture, with unknown/ambiguous cases retained separately.
+- Exact executable-path links to historical Defender records, never automatic
+  malware verdicts. Imported and simulated traffic is not joined to current-host
+  context. See `docs/DEVICE_CONTEXT.md` for limits.
+
+### Evaluation & detection boundaries
+
+- **Current evidence:** On CTU IoT-23 (`8-1`, `21-1`, benign `4-1`), frozen
+  `AHEM-v6.1` residuals did not outperform `base_logreg` (`0.998246` vs
+  `0.999219` PR-AUC on `8-1 -> 21-1`), benign `4-1` threshold calibration failed
+  closed (`0.0 FA/h`, `0.0` recall), and full 48 GB AWS CIC-IDS2017 and
+  CSE-CIC-IDS2018 raw PCAP archives are not staged locally, leaving CIC-IDS2017
+  bridge evaluation pending.
+- **Next requirement:** Any future detection claim requires full multi-day
+  labeled captures, published precision/recall at a calibrated false-positive
+  budget, and comparison against simple packet-causal baselines (`base_logreg`,
+  `ewma`, `split_cell_v1`).
 
 ## Sizing guidance
 
 At 10 Mbps sustained, the traffic volume is roughly 4.5 GB per hour and 108 GB
-per day before capture overhead and any truncation or filtering. Actual PCAP and
-flow-metadata storage depends on traffic, capture configuration, and schema;
-measure it rather than assuming a fixed daily metadata volume. Defaults should
+per day before capture overhead and any truncation or filtering. Defaults should
 favor metadata, short raw rings, and explicit opt-in for payload retention once
 those controls exist.
 

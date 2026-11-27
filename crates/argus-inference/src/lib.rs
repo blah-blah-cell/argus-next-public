@@ -6,6 +6,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod split_cell;
+
 use std::{
     fmt,
     fs::File,

@@ -1984,7 +1984,33 @@ input:focus {
   height: 17px;
   margin: 2px 0 0;
   accent-color: var(--cyan);
+  flex: 0 0 17px;
+  appearance: auto;
+  cursor: pointer;
 }
+
+#onboarding-defender-mode,
+#diagnostics-defender-mode {
+  display: block;
+  max-width: 100%;
+  margin: 8px 0;
+  padding: 8px 10px;
+  color: var(--text-heading);
+  background: var(--panel-card-2);
+  border: 1px solid var(--line-card);
+  border-radius: 6px;
+}
+
+#defender-action-confirm {
+  max-width: min(520px, 90vw);
+  padding: 24px;
+  color: var(--text-heading);
+  background: var(--panel-card-2);
+  border: 1px solid var(--line-card);
+  border-radius: 8px;
+}
+#defender-action-confirm::backdrop { background: rgb(0 0 0 / 65%); }
+#defender-action-confirm p { line-height: 1.5; }
 
 .shutdown-preference strong {
   color: var(--text-heading);

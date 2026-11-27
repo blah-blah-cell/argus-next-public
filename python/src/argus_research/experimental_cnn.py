@@ -21,7 +21,7 @@ import torch
 
 from . import ahem_v3 as frozen_v61_v3
 from . import ahem_v4 as frozen_v61_v4
-from . import ahem_v61_frozen, laya_window_router
+from . import ahem_v61_frozen, compact_router, laya_window_router
 from .live_episode_router import (
     RuntimeEpisodeDecision, build_runtime_episode_decision,
     runtime_flow_identity_status,
@@ -85,8 +85,8 @@ AHEM_V63_PROTOCOL_SHA256 = (
     "79d51caca2fcc4269ba16dca2a194dc3ab846329fb715d8b78e12c6f47be45cb"
 )
 AHEM_E2E_MODEL_ID = "ahem_e2e_experimental"
-AHEM_E2E_CHECKPOINT_SHA256 = "f4ed02499db772df25a5273d182b31c70ddebc1c782a45e787f39cc4dec27593"
-AHEM_E2E_CHECKPOINT = "challengers/ahem_e2e_experimental_step3808.pt"
+AHEM_E2E_CHECKPOINT_SHA256 = "d206c62997c283bd050d4a29e09988a1aa431e73b4fbd1729bb0f2c94ce3549f"
+AHEM_E2E_CHECKPOINT = "output/vm-20261101-evidence/seed-20261018/step-0003808.pt"
 AHEM_E2E_CONFIG = {
     "width": 256, "key_dim": 64, "phase_width": 128,
     "local_packets": 128, "slots": 16, "horizon": 10_000,
@@ -105,28 +105,15 @@ class RecoveredAhemShadow:
         if _sha256(checkpoint) != AHEM_E2E_CHECKPOINT_SHA256:
             raise ValueError("recovered checkpoint SHA-256 differs")
         payload = torch.load(checkpoint, map_location="cpu", weights_only=True)
-        if not isinstance(payload, dict) or payload.get("schema") != "argus.ahem-e2e-inference-weights/v1":
+        if not isinstance(payload, dict) or payload.get("schema") != "argus.full-ahem-training/v1":
             raise ValueError("recovered checkpoint schema differs")
         if payload.get("config") != AHEM_E2E_CONFIG:
             raise ValueError("recovered checkpoint configuration differs")
-        if payload.get("step") != 3808 or payload.get("seed") != 20261018:
+        if payload.get("step") != 3808 or payload.get("binding", {}).get("seed") != 20261018:
             raise ValueError("recovered checkpoint identity differs")
-        required_metadata = {
-            "source_checkpoint_sha256": "d206c62997c283bd050d4a29e09988a1aa431e73b4fbd1729bb0f2c94ce3549f",
-            "security_detector": False,
-            "publication_evidence": False,
-            "promotion_eligible": False,
-            "evaluation_status": "unvalidated_recovered_incomplete_run",
-        }
-        if any(payload.get(key) != expected for key, expected in required_metadata.items()):
-            raise ValueError("recovered checkpoint inference contract differs")
-        if set(payload) != {"schema", "config", "step", "seed", "state_dict", *required_metadata}:
-            raise ValueError("recovered checkpoint contains unexpected metadata")
-        state = payload.get("state_dict")
+        state = payload.get("model")
         if not isinstance(state, dict) or not state or any(
-            not isinstance(value, torch.Tensor)
-            or value.dtype != torch.float32
-            or not torch.isfinite(value).all()
+            not isinstance(value, torch.Tensor) or not torch.isfinite(value).all()
             for value in state.values()
         ):
             raise ValueError("recovered checkpoint weights absent or non-finite")
@@ -235,13 +222,12 @@ def _smooth_l1_scalar(prediction: float, target: float) -> float:
 def evidence_weighted_consensus(
     forecasts: dict[str, object], router: dict[str, object]
 ) -> dict[str, object]:
-    """Blend only contract-compatible forecasts using causal router weights.
+    """Blend only contract-compatible packet-causal-v1 forecasts using causal router weights.
 
     AHEM v6.1 is deliberately excluded: it forecasts the next packet on the
-    same flow, while legacy experts forecast the next globally observed packet.
-    Mixing those targets would manufacture a meaningless score.
+    same flow, while packet-causal-v1 experts forecast the next globally observed
+    packet. Mixing those targets would manufacture a meaningless score.
     """
-    episode_route = router.get("source") == laya_window_router.EPISODE_ROUTER_SOURCE
     if router.get("used_fallback") is True and isinstance(
         router.get("selected_expert"), str
     ):
@@ -259,9 +245,7 @@ def evidence_weighted_consensus(
             continue
         if result.get("experimental_shadow") is True:
             continue
-        if episode_route and result.get("contract") != "packet-causal-flow-v2/next_same_flow_packet":
-            continue
-        if not episode_route and result.get("contract") == "packet-causal-flow-v2/next_same_flow_packet":
+        if result.get("contract") == "packet-causal-flow-v2/next_same_flow_packet":
             continue
         try:
             weight = max(0.0, float(raw_weight))
@@ -279,32 +263,6 @@ def evidence_weighted_consensus(
         }
     total = sum(weight for _, _, weight in candidates)
     weights = {name: weight / total for name, _, weight in candidates}
-    if episode_route:
-        predicted = torch.tensor(
-            [
-                sum(weights[name] * float(result["predicted_features"][index])
-                    for name, result, _ in candidates)
-                for index in range(12)
-            ]
-        )
-        observed = torch.tensor(candidates[0][1]["observed_features"])
-        field_weights = torch.tensor([1.0, 4.0] + [0.5] * 10)
-        error = float((
-            torch.nn.functional.smooth_l1_loss(predicted, observed, reduction="none")
-            * field_weights
-        ).sum() / field_weights.sum())
-        return {
-            "state": "forecast_only",
-            "contract": "packet-causal-flow-v2/next_same_flow_packet",
-            "weight_source": "frozen_uniform_episode_subset",
-            "model_weights": weights,
-            "predicted_log_packet_length": float(predicted[0]),
-            "predicted_log_interarrival": float(predicted[1]),
-            "observed_log_packet_length": float(observed[0]),
-            "observed_log_interarrival": float(observed[1]),
-            "forecast_error": error,
-            "cross_contract_blending": False,
-        }
     predicted_length = sum(
         weights[name] * float(result["predicted_log_packet_length"])
         for name, result, _ in candidates
@@ -588,6 +546,8 @@ class AhemV31StreamingMemory:
         prediction = output.prediction[0]
         return {
             "state": "forecast_only",
+            "feature_schema": "packet-causal-v1",
+            "contract": "packet-causal-v1/next_global_packet",
             "context_packets": (
                 self.cache.chunk_count * self.model.chunk_size
                 + self.model.local_packets
@@ -663,6 +623,8 @@ class AhemV32StreamingMemory:
         prediction = output.prediction[0]
         return {
             "state": "forecast_only",
+            "feature_schema": "packet-causal-v1",
+            "contract": "packet-causal-v1/next_global_packet",
             "context_packets": (
                 self.cache.chunk_count * self.model.chunk_size
                 + self.model.local_packets
@@ -1221,6 +1183,9 @@ class TemporalEnsemble:
         self.rejected: dict[str, str] = {}
         self.router: CausalRouter | None = None
         self.router_manifest: dict[str, object] | None = None
+        self.compact_router = compact_router.CompactWindowRouter.from_environment(
+            model_dir=model_dir
+        )
         self.laya_router = laya_window_router.LayaWindowRouter(
             None, None, "not configured"
         )
@@ -1310,7 +1275,7 @@ class TemporalEnsemble:
         elif enable_ahem_e2e_shadow:
             checkpoint = model_dir / "challengers" / "ahem_e2e_experimental_step3808.pt"
             if not checkpoint.is_file():
-                checkpoint = Path(__file__).resolve().parents[3] / "models" / AHEM_E2E_CHECKPOINT
+                checkpoint = Path(__file__).resolve().parents[3] / AHEM_E2E_CHECKPOINT
             try:
                 self.ahem_e2e_shadow = RecoveredAhemShadow(checkpoint)
             except Exception as error:  # noqa: BLE001 - optional shadow quarantined
@@ -1371,6 +1336,7 @@ class TemporalEnsemble:
                 }
             )
         status["excluded_runtime_models"] = excluded
+        status["compact_router"] = self.compact_router.status()
         return status
 
     def _load_ahem_v61(self) -> None:
@@ -1819,6 +1785,51 @@ class TemporalEnsemble:
                 }
         if (
             self.router is None
+            and self.compact_router.ready
+            and window_features is not None
+            and rows is not None
+            and history_scope is not None
+            and len(window_features) > compact_router.MIN_WINDOW_PACKETS
+            and len(rows) == len(window_features)
+        ):
+            available_experts = {
+                name
+                for name in self.models
+                if name not in self.user_disabled_models
+            }
+            if self.compact_router.config is not None and any(
+                expert in available_experts
+                for expert in self.compact_router.config.experts
+            ):
+                try:
+                    # Strictly causal prefix excluding the target packet (index -1) so
+                    # compact_window[i] aligns 1-to-1 with compact_rows[i] across both
+                    # >=129-packet windows and shorter 33..128-packet live segments.
+                    causal_len = min(128, len(rows) - 1)
+                    compact_window = window_features[-causal_len - 1 : -1]
+                    compact_rows = rows[-causal_len - 1 : -1]
+                    if len(compact_rows) == len(compact_window) >= compact_router.MIN_WINDOW_PACKETS:
+                        compact_result = self.compact_router.route_window(
+                            compact_window.cpu().tolist(),
+                            compact_rows,
+                            history_scope,
+                            available_experts=available_experts,
+                        )
+                        if laya_attempt is not None:
+                            compact_result["laya_attempt"] = laya_attempt
+                        if compact_result.get("state") == "active":
+                            selected = compact_result.get("selected_expert")
+                            if isinstance(selected, str):
+                                return selected, compact_result
+                except Exception as error:  # noqa: BLE001 - fail-closed router boundary
+                    laya_attempt = {
+                        "state": "error",
+                        "source": compact_router.COMPACT_ROUTER_SOURCE,
+                        "detail": str(error),
+                        "execution_ms": _elapsed_ms(started_ns),
+                    }
+        if (
+            self.router is None
             or self.router_manifest is None
             or len(self.history) < 129
         ):
@@ -2032,6 +2043,7 @@ class TemporalEnsemble:
                 "history_reset": history_reset,
                 "history_reset_reason": history_reset_reason,
                 "router": {"state": "warming_up"},
+                "compact_router": self.compact_router.status(),
                 "laya_router": self._laya_status(),
                 "consensus": {
                     "state": "warming_up",
@@ -2095,11 +2107,6 @@ class TemporalEnsemble:
             route_total_ms = _elapsed_ms(route_started_ns)
             if episode_error is not None:
                 router_result["episode_adapter_error"] = episode_error
-            episode_route_active = (
-                router_result.get("source") == laya_window_router.EPISODE_ROUTER_SOURCE
-                and router_result.get("state") == "active"
-                and episode_decision is not None
-            )
             routed_experts_value = router_result.get("eligible_experts")
             routed_experts = (
                 {str(name) for name in routed_experts_value}
@@ -2185,27 +2192,20 @@ class TemporalEnsemble:
                     ):
                         forecasts[name] = {"state": "skipped_by_router"}
                         continue
-                    episode_expert = episode_route_active and name in selected_experts
-                    context = (
-                        31 if name == "cnn_cse" else 128
-                    ) if episode_expert else min(requested_context, len(self.history) - 1)
+                    # All models in self.models strictly follow packet-causal-v1
+                    # (global interarrival history, next_global_packet target) and
+                    # must never receive v6_features or episode_decision.context_indices,
+                    # even when episode routing is active.
+                    context = min(requested_context, len(self.history) - 1)
                     if context < (65 if name == "ahem_fixed" else 2):
                         forecasts[name] = {
                             "state": "warming_up",
                             "context_packets": context,
                         }
                         continue
-                    target = v6_features[-1] if episode_expert else self.history[-1]
+                    target = self.history[-1]
                     model_device = next(model.parameters()).device
-                    if episode_expert:
-                        assert episode_decision is not None
-                        context_source = v6_features[
-                            list(episode_decision.context_indices[-context:])
-                        ].unsqueeze(0)
-                        context_input = self._stage_to_device(
-                            context_source, model_device, eff_micro_batch_size
-                        )
-                    elif (
+                    if (
                         self.device.type == "cuda"
                         and model_device.type == "cuda"
                         and gpu_window is not None
@@ -2231,10 +2231,7 @@ class TemporalEnsemble:
                             model_device = torch.device("cpu")
                             gpu_window = None
                         try:
-                            retry_context = (
-                                context_source if episode_expert
-                                else self.history[-context - 1 : -1].unsqueeze(0)
-                            )
+                            retry_context = self.history[-context - 1 : -1].unsqueeze(0)
                             prediction = model(retry_context)[0].cpu()
                         except Exception as cpu_error:  # noqa: BLE001
                             forecasts[name] = {
@@ -2244,31 +2241,17 @@ class TemporalEnsemble:
                             }
                             continue
                     execution_ms = _elapsed_ms(model_started_ns)
-                    if episode_expert:
-                        field_weights = torch.tensor([1.0, 4.0] + [0.5] * 10)
-                        error = float((
-                            torch.nn.functional.smooth_l1_loss(
-                                prediction, target, reduction="none"
-                            ) * field_weights
-                        ).sum() / field_weights.sum())
-                    else:
-                        error = torch.nn.functional.smooth_l1_loss(
-                            prediction, target
-                        ).item()
+                    error = torch.nn.functional.smooth_l1_loss(
+                        prediction, target
+                    ).item()
                     forecasts[name] = {
                         "state": "forecast_only",
                         "checkpoint": checkpoint.name,
                         "checkpoint_sha256": _sha256(checkpoint),
                         "context_packets": context,
                         "forecast_error": error,
-                        **({
-                            "predicted_features": prediction.tolist(),
-                            "observed_features": target.tolist(),
-                        } if episode_expert else {}),
-                        "contract": (
-                            "packet-causal-flow-v2/next_same_flow_packet"
-                            if episode_expert else "packet-causal-v1/next_global_packet"
-                        ),
+                        "feature_schema": "packet-causal-v1",
+                        "contract": "packet-causal-v1/next_global_packet",
                         "predicted_log_packet_length": float(prediction[0]),
                         "observed_log_packet_length": float(target[0]),
                         "predicted_log_interarrival": float(prediction[1]),
@@ -2459,16 +2442,11 @@ class TemporalEnsemble:
             "micro_batch_size": eff_micro_batch_size,
         }
         consensus = evidence_weighted_consensus(forecasts, router_result)
-        episode_consensus = (
-            consensus
-            if router_result.get("source") == laya_window_router.EPISODE_ROUTER_SOURCE
-            else {"state": "unavailable", "reason": "episode router did not admit a route"}
-        )
-        legacy_consensus = (
-            {"state": "not_applicable", "reason": "episode route uses a same-flow target"}
-            if router_result.get("source") == laya_window_router.EPISODE_ROUTER_SOURCE
-            else consensus
-        )
+        episode_consensus = {
+            "state": "unavailable",
+            "reason": "no packet-causal-flow-v2 routed experts",
+        }
+        legacy_consensus = consensus
         ahem_primary = forecasts.get("ahem_v61", {"state": "unavailable"})
         return {
             "mode": "temporal_ensemble_forecast_only",
@@ -2528,6 +2506,7 @@ class TemporalEnsemble:
             },
             "rejected_models": self.rejected,
             "router": router_result,
+            "compact_router": self.compact_router.status(),
             "laya_router": self._laya_status(),
             "daily_learning": learning_status,
             "telemetry": {

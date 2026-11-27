@@ -34,7 +34,7 @@ if ($OutputDirectory -and -not (Test-Path -LiteralPath $OutputDirectory)) {
 
 $InstallerRoot = Join-Path $RepositoryRoot 'installer'
 $Cargo = (Get-Command cargo -ErrorAction Stop).Source
-& $Cargo build --release --manifest-path (Join-Path $InstallerRoot 'Cargo.toml')
+& $Cargo build --locked --release --manifest-path (Join-Path $InstallerRoot 'Cargo.toml')
 if ($LASTEXITCODE -ne 0) { throw 'The setup program failed to compile.' }
 
 $Stub = Join-Path $InstallerRoot 'target\release\argus-setup.exe'

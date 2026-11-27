@@ -1538,6 +1538,9 @@ async function loadCaptures(selectNewest = false) {
 
 function updateRollingControl(status) {
   state.rolling = status.running;
+  if (typeof window !== 'undefined' && window.dispatchEvent) {
+    window.dispatchEvent(new CustomEvent('argus:device-monitor', {detail: state.rolling && !status.stopping}));
+  }
   state.monitorStopping = Boolean(status.stopping);
   state.sensorHealth = status.sensor ?? null;
   const button = $("rolling-button");
@@ -1967,6 +1970,12 @@ function renderRun(run, simulation = state.runIsSimulation, live = state.runIsLi
     ? `OFFLINE REPLAY · ${run.source} · read-only analysis; not live monitoring`
     : simulation ? "SYNTHETIC SIMULATION · not live traffic" : live ? "LIVE CAPTURE ANALYSIS" : "CAPTURE ANALYSIS";
   state.flows = run.flows;
+  if (typeof window !== 'undefined' && window.dispatchEvent) {
+    window.dispatchEvent(new CustomEvent('argus:device-flows', {detail: {
+      live: state.runIsLive && !state.runIsOfflineReplay,
+      session: run.session, flows: run.flows,
+    }}));
+  }
   $("metric-packets").textContent = formatNumber(run.health.processedPackets);
   $("metric-records").textContent =
     `${formatNumber(run.health.sourceRecords)} source records`;

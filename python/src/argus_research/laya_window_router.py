@@ -31,6 +31,14 @@ from typing import Protocol
 
 import torch
 
+from .compact_router import (
+    COMPACT_ROUTER_SCHEMA,
+    COMPACT_ROUTER_SOURCE,
+    CompactRouterConfig,
+    CompactWindowRouter,
+    default_compact_router_path,
+)
+
 EVIDENCE_SCHEMA = "argus.causal-window-evidence/v1"
 ROUTER_SCHEMA = "argus.laya-window-router/v1"
 QUESTION_SCHEMA = "argus.laya-expert-routing-questions/v1"
@@ -723,3 +731,38 @@ def routing_questions(trained: list[str]) -> dict[str, dict[str, object]]:
         }
 
     return questions
+
+
+def load_compact_router(
+    artifact_path: Path | None = None, model_dir: Path | None = None
+) -> CompactWindowRouter:
+    """Load the pure-Python ``compact-router-v1`` runtime without PyTorch or GPU."""
+    return CompactWindowRouter.from_environment(
+        artifact_path=artifact_path, model_dir=model_dir
+    )
+
+
+__all__ = [
+    "COMPACT_ROUTER_SCHEMA",
+    "COMPACT_ROUTER_SOURCE",
+    "CompactRouterConfig",
+    "CompactWindowRouter",
+    "EPISODE_EVIDENCE_SCHEMA",
+    "EPISODE_QUESTION_SCHEMA",
+    "EPISODE_ROUTER_SCHEMA",
+    "EPISODE_ROUTER_SOURCE",
+    "EVIDENCE_SCHEMA",
+    "LayaAgent",
+    "LayaRouterConfig",
+    "LayaWindowRouter",
+    "MANIFEST_FILE",
+    "MAX_EXPERTS",
+    "MIN_WINDOW_PACKETS",
+    "QUESTION_SCHEMA",
+    "ROUTER_SCHEMA",
+    "WEIGHTS_FILE",
+    "causal_window_evidence",
+    "default_compact_router_path",
+    "load_compact_router",
+    "routing_questions",
+]

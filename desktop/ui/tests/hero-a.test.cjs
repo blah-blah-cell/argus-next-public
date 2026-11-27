@@ -1,9 +1,10 @@
 const {test,before}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 let math;before(async()=>{math=await import('../spatial/hero-math.mjs');});
 const root=path.join(__dirname,'..'),data=JSON.parse(fs.readFileSync(path.join(root,'spatial/assets/hero-a.geometry.json')));
-test('reference extraction contains exactly the requested three hero meshes',()=> {
+test('clean-room procedural hero geometry contains the three Argus hero meshes',()=> {
   assert.equal(data.schema,'argus/hero-reference-geometry/v1');
-  assert.deepEqual(data.meshes.map(m=>m.name),['Alche_A','Alche_Outline','Alche_SideScreen']);
+  assert.equal(data.source,'clean-room-procedural-argus-hero-v1');
+  assert.deepEqual(data.meshes.map(m=>m.name),['Argus_A','Argus_Outline','Argus_SideScreen']);
   assert.equal(data.meshes[0].position.count,1588);assert.equal(data.meshes[0].index.count,6891);
   assert.equal(data.meshes[1].position.count,7690);assert.equal(data.meshes[2].position.count,4);
 });
@@ -37,5 +38,8 @@ test('hero uses local assets, real refraction input and explicitly owned GPU cle
   assert.doesNotMatch(source,/plateScene|plateCamera|fillText/);
   assert.doesNotMatch(source,/https?:\/\/|Math.random\(|setInterval|setAnimationLoop/);
   const notice=fs.readFileSync(path.join(root,'spatial/assets/NOTICE.md'),'utf8');
-  assert.match(notice,/No redistribution licence/);
+  assert.match(notice,/clean-room procedurally generated/i);
+  assert.match(notice,/Apache-2\.0/);
+  assert.match(notice,/CC0-1\.0/);
+  assert.doesNotMatch(notice,/https?:\/\//i);
 });

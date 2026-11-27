@@ -2,15 +2,14 @@
 //!
 //! Provides bounded TTL caching for expensive IPC endpoints (`recent_captures`,
 //! `get_network_topology`, and `generate_network_dossier`) using standard library
-//! primitives (`Instant`, `Duration`, `Mutex`, `HashMap`) with zero unsafe code.
+//! primitives (`Instant`, `Duration`, `Mutex`) with zero unsafe code.
 
 use std::{
-    collections::HashMap,
     sync::{Arc, Mutex, OnceLock, Weak},
     time::{Duration, Instant},
 };
 
-use argus_capture::{AssetFingerprint, NetworkTopology};
+use argus_capture::NetworkTopology;
 
 use crate::DossierReportDto;
 
@@ -20,7 +19,17 @@ fn active_cache_registry() -> &'static Mutex<Option<Weak<IpcQueryCache>>> {
     ACTIVE_CACHE.get_or_init(|| Mutex::new(None))
 }
 
+/// Topology cache TTL aligned above the desktop UI's 5,000 ms poll interval
+/// (`desktop/ui/app.js`) so idle consecutive polls hit the cache instead of
+/// expiring every cycle.
+pub const TOPOLOGY_CACHE_TTL: Duration = Duration::from_secs(6);
+
 /// Traffic state fingerprint used to key the topology cache.
+///
+/// `LiveHistory` only mutates when a completed capture segment is appended, so
+/// all fields remain stable across consecutive 5 s UI polls when no new segment
+/// has arrived. Including `packets` and `bytes` ensures the cached
+/// `NetworkTopology` totals refresh immediately once a new segment lands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct TopologyStateFingerprint {
     pub segments: u64,
@@ -28,6 +37,16 @@ pub struct TopologyStateFingerprint {
     pub bytes: u64,
     pub flows_len: usize,
     pub evicted_flows: u64,
+}
+
+impl TopologyStateFingerprint {
+    /// Returns the structural epoch `(segments, flows_len, evicted_flows)`
+    /// independent of cumulative packet/byte counters.
+    #[allow(dead_code)]
+    #[must_use]
+    pub const fn structural_epoch(self) -> (u64, usize, u64) {
+        (self.segments, self.flows_len, self.evicted_flows)
+    }
 }
 
 /// Composite state fingerprint used to key the dossier cache.
@@ -44,8 +63,6 @@ pub struct IpcQueryCache {
     recent_captures: Mutex<Option<(Instant, Vec<String>)>>,
     topology: Mutex<Option<(Instant, TopologyStateFingerprint, NetworkTopology)>>,
     dossier: Mutex<Option<(Instant, DossierStateFingerprint, DossierReportDto)>>,
-    #[allow(dead_code)]
-    ip_assets: Mutex<HashMap<String, AssetFingerprint>>,
 }
 
 impl Default for IpcQueryCache {
@@ -54,7 +71,6 @@ impl Default for IpcQueryCache {
             recent_captures: Mutex::new(None),
             topology: Mutex::new(None),
             dossier: Mutex::new(None),
-            ip_assets: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -144,6 +160,34 @@ impl IpcQueryCache {
         }
     }
 
+    #[cfg(test)]
+    fn set_topology_at(
+        &self,
+        timestamp: Instant,
+        fingerprint: TopologyStateFingerprint,
+        topology: NetworkTopology,
+    ) {
+        if let Ok(mut guard) = self.topology.lock() {
+            *guard = Some((timestamp, fingerprint, topology));
+        }
+    }
+
+    #[cfg(test)]
+    fn get_topology_at(
+        &self,
+        now: Instant,
+        fingerprint: TopologyStateFingerprint,
+        ttl: Duration,
+    ) -> Option<NetworkTopology> {
+        let guard = self.topology.lock().ok()?;
+        let (ts, cached_fp, topo) = guard.as_ref()?;
+        if *cached_fp == fingerprint && now.saturating_duration_since(*ts) < ttl {
+            Some(topo.clone())
+        } else {
+            None
+        }
+    }
+
     /// Retrieves cached network dossier if fingerprint matches and entry has not expired.
     #[must_use]
     pub fn get_dossier(
@@ -165,28 +209,6 @@ impl IpcQueryCache {
         if let Ok(mut guard) = self.dossier.lock() {
             *guard = Some((Instant::now(), fingerprint, dossier));
         }
-    }
-
-    /// Looks up a cached asset fingerprint for the specified IP address.
-    #[allow(dead_code)]
-    #[must_use]
-    pub fn get_asset(&self, ip: &str) -> Option<AssetFingerprint> {
-        self.ip_assets.lock().ok()?.get(ip).cloned()
-    }
-
-    /// Caches an asset fingerprint for the specified IP address.
-    #[allow(dead_code)]
-    pub fn set_asset(&self, ip: String, asset: AssetFingerprint) {
-        if let Ok(mut guard) = self.ip_assets.lock() {
-            guard.insert(ip, asset);
-        }
-    }
-
-    /// Returns a copy of the current IP assets map.
-    #[allow(dead_code)]
-    #[must_use]
-    pub fn clone_assets(&self) -> HashMap<String, AssetFingerprint> {
-        self.ip_assets.lock().map(|g| g.clone()).unwrap_or_default()
     }
 }
 
@@ -279,5 +301,58 @@ mod tests {
 
         IpcQueryCache::invalidate_global_recent_captures();
         assert_eq!(cache.get_recent_captures(Duration::from_secs(10)), None);
+    }
+
+    #[test]
+    fn test_topology_cache_ttl_covers_five_second_ui_poll_interval() {
+        assert!(
+            TOPOLOGY_CACHE_TTL >= Duration::from_secs(5),
+            "TOPOLOGY_CACHE_TTL ({TOPOLOGY_CACHE_TTL:?}) must be >= 5s UI poll interval"
+        );
+        let fp1 = TopologyStateFingerprint {
+            segments: 7,
+            packets: 420,
+            bytes: 12_345,
+            flows_len: 14,
+            evicted_flows: 2,
+        };
+        let fp2 = TopologyStateFingerprint {
+            segments: 8,
+            packets: 450,
+            bytes: 14_000,
+            flows_len: 15,
+            evicted_flows: 2,
+        };
+        assert_eq!(fp1.structural_epoch(), (7, 14, 2));
+
+        let cache = IpcQueryCache::default();
+        let dummy_topo = NetworkTopology {
+            nodes: Vec::new(),
+            edges: Vec::new(),
+            protocol_distribution: argus_capture::ProtocolDistribution::default(),
+            lan_hosts_count: 1,
+            external_hosts_count: 1,
+            tor_nodes_count: 0,
+            malicious_nodes_count: 0,
+            total_bytes: 12_345,
+            total_packets: 420,
+        };
+        let t0 = Instant::now();
+        cache.set_topology_at(t0, fp1, dummy_topo.clone());
+
+        // Consecutive 5s UI poll with unchanged fingerprint MUST hit.
+        let at_5s = t0 + Duration::from_secs(5);
+        assert_eq!(
+            cache.get_topology_at(at_5s, fp1, TOPOLOGY_CACHE_TTL),
+            Some(dummy_topo)
+        );
+        // Changed fingerprint at 5s MUST miss.
+        assert_eq!(cache.get_topology_at(at_5s, fp2, TOPOLOGY_CACHE_TTL), None);
+        // After TOPOLOGY_CACHE_TTL elapses, even unchanged fingerprint MUST miss.
+        let at_expiry = t0 + TOPOLOGY_CACHE_TTL;
+        assert_eq!(
+            cache.get_topology_at(at_expiry, fp1, TOPOLOGY_CACHE_TTL),
+            None
+        );
     }
 }

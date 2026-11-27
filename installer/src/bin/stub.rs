@@ -217,10 +217,6 @@ fn write_install_record(directory: &Path, version: &str, package: &Package) -> i
     fs::write(directory.join("INSTALL.txt"), text)
 }
 
-fn powershell_quote(path: &Path) -> String {
-    path.to_string_lossy().replace('\'', "''")
-}
-
 fn shared_installation_script() -> &'static str {
     // Read-only, errors fail closed. Use the same Windows known folders as the
     // shortcut writer, rather than guessing from an unredirected Desktop path.
@@ -252,42 +248,39 @@ fn shared_installation_exists() -> io::Result<bool> {
     }
 }
 
+fn create_shortcuts_script() -> &'static str {
+    "$ErrorActionPreference='Stop'; \
+     $shell=New-Object -ComObject WScript.Shell; \
+     $target=$env:ARGUS_TARGET; $work=$env:ARGUS_WORK_DIR; \
+     if (!$target -or !$work) { throw 'missing shortcut target environment variables' }; \
+     $programs=[Environment]::GetFolderPath('Programs'); \
+     if (!$programs) { throw 'Start Menu Programs folder is unavailable' }; \
+     if (!(Test-Path -LiteralPath $programs)) { New-Item -ItemType Directory -Force -Path $programs | Out-Null }; \
+     $links=@((Join-Path $programs 'Argus Next Public.lnk')); \
+     $desktop=[Environment]::GetFolderPath('Desktop'); \
+     if ($desktop) { $links += (Join-Path $desktop 'Argus Next Public.lnk') }; \
+     foreach ($link in $links) { \
+        $shortcut=$shell.CreateShortcut($link); \
+        $shortcut.TargetPath=$target; \
+        $shortcut.WorkingDirectory=$work; \
+        $shortcut.IconLocation=($target + ',0'); \
+        $shortcut.Description='Argus Next Public'; \
+        $shortcut.Save() \
+     }"
+}
+
 fn create_shortcuts(directory: &Path) -> io::Result<()> {
-    let appdata = env::var_os("APPDATA")
-        .ok_or_else(|| io::Error::other("APPDATA is not set; cannot create shortcuts"))?;
-    let start_menu = PathBuf::from(appdata).join(r"Microsoft\Windows\Start Menu\Programs");
-    fs::create_dir_all(&start_menu)?;
-
-    let link = start_menu.join("Argus Next Public.lnk");
     let target = directory.join(APP_EXE);
-    let script = format!(
-        "$ErrorActionPreference='Stop'; \
-         $shell=New-Object -ComObject WScript.Shell; \
-         $target='{target}'; $work='{work}'; \
-         $links=@('{start}'); \
-         $desktop=[Environment]::GetFolderPath('Desktop'); \
-         if ($desktop) {{ $links += (Join-Path $desktop 'Argus Next Public.lnk') }}; \
-         foreach ($link in $links) {{ \
-            $shortcut=$shell.CreateShortcut($link); \
-            $shortcut.TargetPath=$target; \
-            $shortcut.WorkingDirectory=$work; \
-            $shortcut.IconLocation=($target + ',0'); \
-            $shortcut.Description='Argus Next Public'; \
-            $shortcut.Save() \
-         }}",
-        target = powershell_quote(&target),
-        work = powershell_quote(directory),
-        start = powershell_quote(&link),
-    );
-
     let output = Command::new("powershell")
+        .env("ARGUS_TARGET", &target)
+        .env("ARGUS_WORK_DIR", directory)
         .args([
             "-NoProfile",
             "-NonInteractive",
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
-            &script,
+            create_shortcuts_script(),
         ])
         .output()?;
     if !output.status.success() {
@@ -299,36 +292,34 @@ fn create_shortcuts(directory: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn shortcut_cleanup_script(directory: &Path) -> String {
-    format!(
-        "$ErrorActionPreference='Stop'; $shell=New-Object -ComObject WScript.Shell; \
-         $expected=[IO.Path]::GetFullPath('{}'); \
-         foreach ($folder in @('Programs','Desktop')) {{ \
-           $base=[Environment]::GetFolderPath($folder); if (!$base) {{ continue }}; \
-           $link=Join-Path $base 'Argus Next Public.lnk'; \
-           if (Test-Path -LiteralPath $link) {{ \
-             $item=Get-Item -LiteralPath $link; \
-             if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {{ continue }}; \
-             $target=$shell.CreateShortcut($link).TargetPath; \
-             if ($target -and ([IO.Path]::GetFullPath($target) -ieq $expected)) {{ \
-               Remove-Item -LiteralPath $link -Force \
-             }} \
-           }} \
-         }}",
-        powershell_quote(&directory.join(APP_EXE))
-    )
+fn shortcut_cleanup_script() -> &'static str {
+    "$ErrorActionPreference='Stop'; $shell=New-Object -ComObject WScript.Shell; \
+     if (!$env:ARGUS_TARGET) { throw 'missing ARGUS_TARGET' }; \
+     $expected=[IO.Path]::GetFullPath($env:ARGUS_TARGET); \
+     foreach ($folder in @('Programs','Desktop')) { \
+       $base=[Environment]::GetFolderPath($folder); if (!$base) { continue }; \
+       $link=Join-Path $base 'Argus Next Public.lnk'; \
+       if (Test-Path -LiteralPath $link) { \
+         $item=Get-Item -LiteralPath $link; \
+         if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }; \
+         $target=$shell.CreateShortcut($link).TargetPath; \
+         if ($target -and ([IO.Path]::GetFullPath($target) -ieq $expected)) { \
+           Remove-Item -LiteralPath $link -Force \
+         } \
+       } \
+     }"
 }
 
 fn remove_shortcuts(directory: &Path) -> io::Result<()> {
-    let script = shortcut_cleanup_script(directory);
     let output = Command::new("powershell")
+        .env("ARGUS_TARGET", directory.join(APP_EXE))
         .args([
             "-NoProfile",
             "-NonInteractive",
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
-            &script,
+            shortcut_cleanup_script(),
         ])
         .output()?;
     if output.status.success() {
@@ -401,25 +392,28 @@ fn write_uninstall_entry(uninstaller: &Path, directory: &Path, version: &str) ->
     ])
 }
 
-fn registration_cleanup_script(directory: &Path) -> String {
-    format!(
-        "$ErrorActionPreference='Stop'; \
-         $key='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ArgusNextPublic'; \
-         if (Test-Path -LiteralPath $key) {{ \
-           $current=Get-ItemProperty -LiteralPath $key; \
-           if ($current.InstallLocation -and \
-               ([IO.Path]::GetFullPath($current.InstallLocation) -ieq [IO.Path]::GetFullPath('{}'))) {{ \
-             Remove-Item -LiteralPath $key \
-           }} \
-         }}",
-        powershell_quote(directory)
-    )
+fn registration_cleanup_script() -> &'static str {
+    "$ErrorActionPreference='Stop'; \
+     if (!$env:ARGUS_INSTALL_DIR) { throw 'missing ARGUS_INSTALL_DIR' }; \
+     $key='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ArgusNextPublic'; \
+     if (Test-Path -LiteralPath $key) { \
+       $current=Get-ItemProperty -LiteralPath $key; \
+       if ($current.InstallLocation -and \
+           ([IO.Path]::GetFullPath($current.InstallLocation) -ieq [IO.Path]::GetFullPath($env:ARGUS_INSTALL_DIR))) { \
+         Remove-Item -LiteralPath $key \
+       } \
+     }"
 }
 
 fn remove_uninstall_entry(directory: &Path) -> io::Result<()> {
-    let script = registration_cleanup_script(directory);
     let output = Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .env("ARGUS_INSTALL_DIR", directory)
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            registration_cleanup_script(),
+        ])
         .output()?;
     if output.status.success() {
         Ok(())
@@ -486,6 +480,12 @@ fn app_running() -> io::Result<bool> {
     let output = Command::new("tasklist")
         .args(["/FI", "IMAGENAME eq argus-desktop.exe", "/NH"])
         .output()?;
+    if !output.status.success() {
+        return Err(io::Error::other(format!(
+            "tasklist failed while checking running processes: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )));
+    }
     let report = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
     Ok(report.contains("argus-desktop.exe"))
 }
@@ -562,11 +562,11 @@ mod tests {
     fn generated_maintenance_scripts_parse_without_execution() {
         use std::io::Write;
         use std::process::{Command, Stdio};
-        let directory = Path::new(r"C:\Custom Apps\Kid's Argus");
         for script in [
-            super::shared_installation_script().to_owned(),
-            super::shortcut_cleanup_script(directory),
-            super::registration_cleanup_script(directory),
+            super::shared_installation_script(),
+            super::create_shortcuts_script(),
+            super::shortcut_cleanup_script(),
+            super::registration_cleanup_script(),
         ] {
             // ParseInput is syntax-only: do not invoke/evaluate these scripts,
             // inspect account registration, create COM objects, or delete links.
@@ -586,6 +586,60 @@ mod tests {
                 output.status.success(),
                 "{}",
                 String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn hostile_unicode_quote_paths_cannot_inject_powershell_statements() {
+        use std::process::Command;
+
+        // Paths containing ASCII single quotes, Unicode typographic quotes
+        // (U+2018..U+201B) that PowerShell treats as string delimiters, and
+        // command-injection payloads must stay strictly data via environment
+        // variables rather than being interpolated into script source.
+        let hostile_paths = [
+            r"C:\Users\O'Brien\foo' ; Write-Output PWN; 'bar",
+            "C:\\Users\\O\u{2019}Brien\\foo\u{2019} ; Write-Output PWN; \u{2018}bar",
+            "C:\\Users\\test\\foo\u{201A} ; Write-Output PWN; \u{201B}bar",
+        ];
+
+        for script in [
+            super::create_shortcuts_script(),
+            super::shortcut_cleanup_script(),
+            super::registration_cleanup_script(),
+        ] {
+            assert!(
+                !script.contains("Write-Output PWN"),
+                "static script must never interpolate runtime paths"
+            );
+        }
+
+        for hostile in hostile_paths {
+            let output = Command::new("powershell.exe")
+                .env("ARGUS_TARGET", hostile)
+                .env("ARGUS_INSTALL_DIR", hostile)
+                .args([
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    "[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); \
+                     $t=$env:ARGUS_TARGET; $d=$env:ARGUS_INSTALL_DIR; \
+                     if ($t -ne $d) { exit 2 }; \
+                     [Console]::Write($t)",
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "powershell failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let stdout = String::from_utf8(output.stdout).unwrap();
+            assert_eq!(
+                stdout, hostile,
+                "path must round-trip literally without executing injected statements"
             );
         }
     }

@@ -247,7 +247,9 @@ impl PacketFilter {
                 FilterPredicate::HasTor => packet.observations.tor_port_match,
                 FilterPredicate::HasTls => packet.observations.tls_sni.is_some(),
                 FilterPredicate::HasDns => packet.observations.dns_message,
-                FilterPredicate::ProcessContains(_) => false,
+                // Packet-level views carry no host process attribution; fail closed
+                // regardless of clause negation so `!proc:...` never matches all packets.
+                FilterPredicate::ProcessContains(_) => return false,
                 FilterPredicate::FreeText(needle) => {
                     let init_ip = packet.flow.key.initiator.address.to_string();
                     let resp_ip = packet.flow.key.responder.address.to_string();
@@ -404,12 +406,6 @@ impl PacketFilter {
                         Some(format!("dst portrange {min}-{max}"))
                     }
                 }
-                FilterPredicate::HasDns => Some("port 53".to_owned()),
-                FilterPredicate::HasTls => Some("tcp port 443".to_owned()),
-                FilterPredicate::HasHttp => Some("tcp port 80 or tcp port 8080".to_owned()),
-                FilterPredicate::HasTor => {
-                    Some("port 9001 or port 9030 or port 9050 or port 9150".to_owned())
-                }
                 _ => None,
             };
             if let Some(inner) = expr {
@@ -447,13 +443,14 @@ fn parse_predicate(token: &str) -> Result<FilterPredicate, CaptureError> {
         _ => {}
     }
 
+    // Check if the bare token is an IPv4/IPv6 address or CIDR BEFORE splitting
+    // on `:`, since IPv6 literals contain colons (e.g. `2001:db8::1`, `::1`,
+    // `2001:db8::/32`).
+    if let Ok(cidr) = IpCidr::parse(&lower) {
+        return Ok(FilterPredicate::AnyHost(cidr));
+    }
+
     let Some((key, val)) = lower.split_once(':') else {
-        // Check if bare token is an IP/CIDR
-        if (lower.contains('.') || lower.contains('/'))
-            && let Ok(cidr) = IpCidr::parse(&lower)
-        {
-            return Ok(FilterPredicate::AnyHost(cidr));
-        }
         return Ok(FilterPredicate::FreeText(lower));
     };
 
@@ -688,5 +685,93 @@ mod tests {
             let filter = PacketFilter::parse(query).expect("valid application filter");
             assert!(filter.to_bpf_expression().is_err(), "{query}");
         }
+    }
+
+    #[test]
+    fn parses_bare_and_keyed_ipv6_addresses_and_cidrs() {
+        let ipv6_src: IpAddr = "2001:db8::1".parse().expect("ipv6");
+        let ipv6_dst: IpAddr = "::1".parse().expect("ipv6");
+        let pkt = sample_packet(
+            ipv6_src,
+            50123,
+            ipv6_dst,
+            443,
+            TransportProtocol::Tcp,
+            Some(0x10),
+            None,
+        );
+
+        // Bare IPv6 address
+        let bare = PacketFilter::parse("2001:db8::1").expect("bare ipv6");
+        assert_eq!(
+            bare.clauses[0].predicate,
+            FilterPredicate::AnyHost(IpCidr::parse("2001:db8::1").expect("cidr"))
+        );
+        assert!(bare.matches_packet(&pkt));
+        assert_eq!(bare.to_bpf_expression().expect("bpf"), "(host 2001:db8::1)");
+
+        // Bare IPv6 loopback
+        let loopback = PacketFilter::parse("::1").expect("bare loopback");
+        assert!(loopback.matches_packet(&pkt));
+        assert_eq!(loopback.to_bpf_expression().expect("bpf"), "(host ::1)");
+
+        // Bare IPv6 CIDR
+        let bare_cidr = PacketFilter::parse("2001:db8::/32").expect("bare ipv6 cidr");
+        assert_eq!(
+            bare_cidr.clauses[0].predicate,
+            FilterPredicate::AnyHost(IpCidr::parse("2001:db8::/32").expect("cidr"))
+        );
+        assert!(bare_cidr.matches_packet(&pkt));
+        assert_eq!(
+            bare_cidr.to_bpf_expression().expect("bpf"),
+            "(net 2001:db8::/32)"
+        );
+
+        // Negated bare IPv6
+        let negated = PacketFilter::parse("!2001:db8::1").expect("negated ipv6");
+        assert!(!negated.matches_packet(&pkt));
+        assert_eq!(
+            negated.to_bpf_expression().expect("bpf"),
+            "not (host 2001:db8::1)"
+        );
+
+        // Keyed IPv6 predicates remain intact
+        let keyed =
+            PacketFilter::parse("src:2001:db8::/32 dst:::1 ip:2001:db8::1").expect("keyed ipv6");
+        assert!(keyed.matches_packet(&pkt));
+        assert_eq!(
+            keyed.to_bpf_expression().expect("bpf"),
+            "(src net 2001:db8::/32) and (dst host ::1) and (host 2001:db8::1)"
+        );
+
+        // Negative IPv6 CIDR mismatch
+        let non_matching_pkt = sample_packet(
+            "2001:db9::1".parse().expect("ipv6"),
+            50123,
+            "2001:db9::2".parse().expect("ipv6"),
+            443,
+            TransportProtocol::Tcp,
+            Some(0x10),
+            None,
+        );
+        assert!(!bare_cidr.matches_packet(&non_matching_pkt));
+    }
+
+    #[test]
+    fn negated_process_filter_fails_closed_at_packet_level() {
+        let pkt = sample_packet(
+            "192.0.2.10".parse().expect("ipv4"),
+            51515,
+            "198.51.100.20".parse().expect("ipv4"),
+            443,
+            TransportProtocol::Tcp,
+            Some(0x10),
+            None,
+        );
+        let negated_proc = PacketFilter::parse("!proc:chrome").expect("valid filter");
+        assert!(
+            !negated_proc.matches_packet(&pkt),
+            "!proc: must fail closed on packet views that lack process attribution"
+        );
     }
 }

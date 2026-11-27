@@ -20,6 +20,12 @@ use crate::{
     parse_tls_sni,
 };
 
+/// Default maximum number of concurrent logical flows tracked by the PCAP parser.
+pub const DEFAULT_MAX_ACTIVE_FLOWS: usize = 65_536;
+
+/// Default idle timeout (60 seconds) after which inactive/UDP flows are evicted.
+pub const DEFAULT_FLOW_IDLE_TIMEOUT_NS: u64 = 60_000_000_000;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PcapLimits {
     pub max_file_bytes: NonZeroUsize,
@@ -38,6 +44,8 @@ pub struct PcapLoadReport {
     pub unsupported_ipv4_fragment_packets: usize,
     /// IPv6 packets skipped because fragment reassembly is intentionally unsupported.
     pub unsupported_ipv6_fragment_packets: usize,
+    /// Active flows evicted due to idle timeout or bounded flow-table capacity.
+    pub evicted_flows: usize,
 }
 
 /// Strict PCAP/PCAPNG reader for bounded deterministic replay.
@@ -87,6 +95,29 @@ impl PcapReplaySource {
         bytes: &[u8],
         limits: PcapLimits,
     ) -> Result<Self, CaptureError> {
+        const DEFAULT_MAX_ACTIVE: NonZeroUsize =
+            NonZeroUsize::new(DEFAULT_MAX_ACTIVE_FLOWS).unwrap();
+        Self::from_bytes_with_flow_limits(
+            source_id,
+            bytes,
+            limits,
+            DEFAULT_MAX_ACTIVE,
+            DEFAULT_FLOW_IDLE_TIMEOUT_NS,
+        )
+    }
+
+    /// Parses bounded PCAP bytes with explicit active-flow capacity and idle-eviction timeout.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CaptureError`] under the same conditions as [`Self::from_path`].
+    pub fn from_bytes_with_flow_limits(
+        source_id: &str,
+        bytes: &[u8],
+        limits: PcapLimits,
+        max_active_flows: NonZeroUsize,
+        idle_timeout_ns: u64,
+    ) -> Result<Self, CaptureError> {
         if bytes.len() > limits.max_file_bytes.get() {
             return Err(CaptureError::SourceFailure(format!(
                 "PCAP is {} bytes, exceeding configured limit {}",
@@ -104,7 +135,14 @@ impl PcapReplaySource {
         } else {
             (bytes, None)
         };
-        let parsed = Parser::new(parse_bytes, limits.max_records.get(), timestamps)?.parse()?;
+        let parsed = Parser::new(
+            parse_bytes,
+            limits.max_records.get(),
+            timestamps,
+            max_active_flows.get(),
+            idle_timeout_ns,
+        )?
+        .parse()?;
         let replay_capacity = NonZeroUsize::new(parsed.packets.len().max(1))
             .ok_or_else(|| CaptureError::SourceFailure("invalid replay capacity".to_owned()))?;
         let metadata = SourceMetadata::new(
@@ -521,10 +559,15 @@ struct Parser<'a> {
     nanosecond_timestamps: bool,
     snapshot_length: NonZeroUsize,
     max_records: usize,
+    max_active_flows: usize,
+    idle_timeout_ns: u64,
     offset: usize,
     report: PcapLoadReport,
     generation: FlowGenerationTracker,
     active: HashMap<WireFlow, ActiveFlow>,
+    active_order: VecDeque<(WireFlow, u64)>,
+    active_flow_count: usize,
+    active_tick: u64,
     last_timestamp_ns: u64,
     last_raw_timestamp_ns: u64,
     raw_timestamps: Option<Vec<RawTimestamp>>,
@@ -535,6 +578,8 @@ impl<'a> Parser<'a> {
         bytes: &'a [u8],
         max_records: usize,
         raw_timestamps: Option<Vec<RawTimestamp>>,
+        max_active_flows: usize,
+        idle_timeout_ns: u64,
     ) -> Result<Self, CaptureError> {
         if bytes.len() < 4 {
             return Err(pcap_error("global header is truncated"));
@@ -562,20 +607,90 @@ impl<'a> Parser<'a> {
         if order.u32(&bytes[20..24]) != 1 {
             return Err(pcap_error("only Ethernet PCAP link type is supported"));
         }
+        let max_active_flows = max_active_flows.max(1);
         Ok(Self {
             bytes,
             order,
             nanosecond_timestamps,
             snapshot_length,
             max_records,
+            max_active_flows,
+            idle_timeout_ns,
             offset: 24,
             report: PcapLoadReport::default(),
-            generation: FlowGenerationTracker::default(),
+            generation: FlowGenerationTracker::with_capacity(max_active_flows),
             active: HashMap::new(),
+            active_order: VecDeque::new(),
+            active_flow_count: 0,
+            active_tick: 0,
             last_timestamp_ns: 0,
             last_raw_timestamp_ns: 0,
             raw_timestamps,
         })
+    }
+
+    fn remove_active_flow(&mut self, wire: WireFlow) -> bool {
+        let reverse = wire.reverse();
+        let removed_forward = self.active.remove(&wire).is_some();
+        let removed_reverse = if reverse == wire {
+            false
+        } else {
+            self.active.remove(&reverse).is_some()
+        };
+        if removed_forward || removed_reverse {
+            self.active_flow_count = self.active_flow_count.saturating_sub(1);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn evict_idle_flows(&mut self, now_ns: u64) {
+        if self.idle_timeout_ns == 0 {
+            return;
+        }
+        while let Some(&(candidate, recorded_tick)) = self.active_order.front() {
+            match self.active.get(&candidate) {
+                Some(entry) if entry.last_tick == recorded_tick => {
+                    if now_ns.saturating_sub(entry.last_seen_ns) >= self.idle_timeout_ns {
+                        self.active_order.pop_front();
+                        if self.remove_active_flow(candidate) {
+                            self.report.evicted_flows += 1;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                _ => {
+                    self.active_order.pop_front();
+                }
+            }
+        }
+    }
+
+    fn evict_oldest_active_flow_if_full(&mut self) {
+        while self.active_flow_count >= self.max_active_flows {
+            let Some((candidate, recorded_tick)) = self.active_order.pop_front() else {
+                break;
+            };
+            if self
+                .active
+                .get(&candidate)
+                .is_some_and(|entry| entry.last_tick == recorded_tick)
+                && self.remove_active_flow(candidate)
+            {
+                self.report.evicted_flows += 1;
+            }
+        }
+    }
+
+    fn compact_active_order(&mut self) {
+        let active = &self.active;
+        self.active_order.retain(|(wire, tick)| {
+            active
+                .get(wire)
+                .is_some_and(|entry| entry.last_tick == *tick)
+        });
     }
 
     #[allow(clippy::too_many_lines)]
@@ -795,6 +910,14 @@ impl<'a> Parser<'a> {
             && parse_http_summary(application_payload)
                 .is_some_and(|summary| !summary.is_response && summary.method.is_some());
         let (source_mac, destination_mac) = ethernet_mac_addresses(frame, network_offset);
+        let reordered = timestamp_ns < self.last_timestamp_ns;
+        let monotonic_timestamp_ns = timestamp_ns.max(self.last_timestamp_ns);
+        self.last_timestamp_ns = monotonic_timestamp_ns;
+
+        // Evict idle flows before looking up this packet's 5-tuple so an idle
+        // UDP or abandoned TCP flow cleanly starts a new generation.
+        self.evict_idle_flows(monotonic_timestamp_ns);
+
         let wire = WireFlow {
             source,
             source_port,
@@ -807,12 +930,14 @@ impl<'a> Parser<'a> {
         let starts_new_connection =
             tcp_flags.is_some_and(|flags| flags & 0x02 != 0 && flags & 0x10 == 0);
         if starts_new_connection && self.active.contains_key(&wire) {
-            self.active.remove(&wire);
-            self.active.remove(&reverse);
+            let _ = self.remove_active_flow(wire);
         }
+        self.active_tick = self.active_tick.wrapping_add(1);
+        let tick = self.active_tick;
         let active = if let Some(active) = self.active.get_mut(&wire) {
             active
         } else {
+            self.evict_oldest_active_flow_if_full();
             let flow = self
                 .generation
                 .begin(FlowKey {
@@ -833,16 +958,23 @@ impl<'a> Parser<'a> {
                     flow: flow.clone(),
                     direction: Direction::InitiatorToResponder,
                     next_sequence: 0,
+                    last_seen_ns: monotonic_timestamp_ns,
+                    last_tick: tick,
                 },
             );
-            self.active.insert(
-                reverse,
-                ActiveFlow {
-                    flow,
-                    direction: Direction::ResponderToInitiator,
-                    next_sequence: 0,
-                },
-            );
+            if reverse != wire {
+                self.active.insert(
+                    reverse,
+                    ActiveFlow {
+                        flow,
+                        direction: Direction::ResponderToInitiator,
+                        next_sequence: 0,
+                        last_seen_ns: monotonic_timestamp_ns,
+                        last_tick: tick,
+                    },
+                );
+            }
+            self.active_flow_count = self.active_flow_count.saturating_add(1);
             self.active.get_mut(&wire).ok_or_else(|| {
                 CaptureError::SourceFailure("flow index insertion failed".to_owned())
             })?
@@ -855,20 +987,27 @@ impl<'a> Parser<'a> {
             .ok_or_else(|| CaptureError::SourceFailure("flow sequence overflow".to_owned()))?;
         if let Some(entry) = self.active.get_mut(&wire) {
             entry.next_sequence = next_sequence;
+            entry.last_seen_ns = monotonic_timestamp_ns;
+            entry.last_tick = tick;
         }
-        if let Some(entry) = self.active.get_mut(&reverse) {
+        if reverse != wire
+            && let Some(entry) = self.active.get_mut(&reverse)
+        {
             entry.next_sequence = next_sequence;
+            entry.last_seen_ns = monotonic_timestamp_ns;
+            entry.last_tick = tick;
+        }
+        self.active_order.push_back((wire, tick));
+        if self.active_order.len() > self.max_active_flows.saturating_mul(2) {
+            self.compact_active_order();
         }
 
-        let reordered = timestamp_ns < self.last_timestamp_ns;
-        let monotonic_timestamp_ns = timestamp_ns.max(self.last_timestamp_ns);
-        self.last_timestamp_ns = monotonic_timestamp_ns;
         let capture_ordinal = self.report.packets_emitted as u64;
         self.report.packets_emitted += 1;
-        let close_flow = tcp_flags.is_some_and(|flags| flags & 0x04 != 0);
+        // Close active TCP flow state on either FIN (0x01) or RST (0x04).
+        let close_flow = tcp_flags.is_some_and(|flags| flags & (0x01 | 0x04) != 0);
         if close_flow {
-            self.active.remove(&wire);
-            self.active.remove(&reverse);
+            let _ = self.remove_active_flow(wire);
         }
         Ok(Some(CapturedPacket {
             capture_ordinal,
@@ -1069,6 +1208,8 @@ struct ActiveFlow {
     flow: FlowInstanceId,
     direction: Direction,
     next_sequence: u64,
+    last_seen_ns: u64,
+    last_tick: u64,
 }
 
 fn pcap_error(message: &str) -> CaptureError {
@@ -1746,5 +1887,167 @@ mod tests {
             });
             assert!(outcome.is_ok(), "parser panicked for mutation case {case}");
         }
+    }
+
+    fn udp_frame(source: [u8; 4], src_port: u16, destination: [u8; 4], dst_port: u16) -> Vec<u8> {
+        let mut frame = vec![0_u8; 42];
+        frame[12..14].copy_from_slice(&0x0800_u16.to_be_bytes());
+        frame[14] = 0x45;
+        frame[16..18].copy_from_slice(&28_u16.to_be_bytes());
+        frame[23] = 17;
+        frame[26..30].copy_from_slice(&source);
+        frame[30..34].copy_from_slice(&destination);
+        frame[34..36].copy_from_slice(&src_port.to_be_bytes());
+        frame[36..38].copy_from_slice(&dst_port.to_be_bytes());
+        frame[38..40].copy_from_slice(&8_u16.to_be_bytes());
+        frame
+    }
+
+    #[test]
+    fn tcp_fin_and_rst_close_active_flow_and_advance_generation() {
+        let syn = tcp_frame([192, 0, 2, 1], [198, 51, 100, 2], 0x02);
+        let fin = tcp_frame([192, 0, 2, 1], [198, 51, 100, 2], 0x11);
+        let after_fin = tcp_frame([192, 0, 2, 1], [198, 51, 100, 2], 0x10);
+        let rst = tcp_frame([192, 0, 2, 1], [198, 51, 100, 2], 0x04);
+        let after_rst = tcp_frame([192, 0, 2, 1], [198, 51, 100, 2], 0x10);
+
+        let mut source = PcapReplaySource::from_bytes(
+            "fin-rst",
+            &pcap(&[(1, syn), (2, fin), (3, after_fin), (4, rst), (5, after_rst)]),
+            limits(),
+        )
+        .expect("parse");
+
+        let mut generations = Vec::new();
+        while let CapturePoll::Packet(pkt) = source.poll_next().expect("poll") {
+            generations.push((pkt.flow.generation, pkt.packet.sequence));
+        }
+        assert_eq!(generations, vec![(0, 0), (0, 1), (1, 0), (1, 1), (2, 0)]);
+        assert_eq!(source.report().evicted_flows, 0);
+    }
+
+    #[test]
+    fn udp_idle_timeout_and_capacity_evict_bounded_flows() {
+        let udp1 = udp_frame([192, 0, 2, 1], 40_001, [198, 51, 100, 2], 53);
+        let udp2 = udp_frame([192, 0, 2, 1], 40_002, [198, 51, 100, 2], 53);
+        let udp3 = udp_frame([192, 0, 2, 1], 40_003, [198, 51, 100, 2], 53);
+
+        // Idle timeout eviction (`pcap` helper uses microsecond timestamps;
+        // 24ms gap with a 10ms timeout evicts udp1 before the second packet).
+        let mut idle_source = PcapReplaySource::from_bytes_with_flow_limits(
+            "udp-idle",
+            &pcap(&[(1_000, udp1.clone()), (25_000, udp1.clone())]),
+            limits(),
+            NonZeroUsize::new(16).expect("non-zero"),
+            10_000_000,
+        )
+        .expect("parse");
+        let CapturePoll::Packet(p1) = idle_source.poll_next().expect("p1") else {
+            panic!("expected packet");
+        };
+        let CapturePoll::Packet(p2) = idle_source.poll_next().expect("p2") else {
+            panic!("expected packet");
+        };
+        assert_eq!(p1.flow.generation, 0);
+        assert_eq!(p2.flow.generation, 1);
+        assert_eq!(idle_source.report().evicted_flows, 1);
+
+        // Capacity eviction (max 2 active flows; 3rd distinct flow evicts oldest)
+        let cap_source = PcapReplaySource::from_bytes_with_flow_limits(
+            "udp-cap",
+            &pcap(&[(1, udp1), (2, udp2), (3, udp3)]),
+            limits(),
+            NonZeroUsize::new(2).expect("non-zero"),
+            DEFAULT_FLOW_IDLE_TIMEOUT_NS,
+        )
+        .expect("parse");
+        assert_eq!(cap_source.report().packets_emitted, 3);
+        assert_eq!(cap_source.report().evicted_flows, 1);
+    }
+
+    fn tcp_frame_ports(
+        source: [u8; 4],
+        src_port: u16,
+        destination: [u8; 4],
+        dst_port: u16,
+        flags: u8,
+    ) -> Vec<u8> {
+        let mut frame = tcp_frame(source, destination, flags);
+        frame[34..36].copy_from_slice(&src_port.to_be_bytes());
+        frame[36..38].copy_from_slice(&dst_port.to_be_bytes());
+        frame
+    }
+
+    #[test]
+    fn tcp_syn_scan_flood_and_bidirectional_closure_respect_bounds_and_generations() {
+        // Multi-flow TCP SYN scan flood exceeding capacity (20 unique flows, cap = 4).
+        let mut scan_records = Vec::new();
+        for i in 0..20_u16 {
+            let f = tcp_frame_ports([192, 0, 2, 10], 30_000 + i, [198, 51, 100, 2], 80 + i, 0x02);
+            scan_records.push((u32::from(i) + 1, f));
+        }
+        // Send a second packet on the most recently retained flow (i=19) and on
+        // the oldest evicted flow (i=0).
+        let retained_followup =
+            tcp_frame_ports([192, 0, 2, 10], 30_019, [198, 51, 100, 2], 99, 0x10);
+        let evicted_followup =
+            tcp_frame_ports([192, 0, 2, 10], 30_000, [198, 51, 100, 2], 80, 0x10);
+        scan_records.push((21, retained_followup));
+        scan_records.push((22, evicted_followup));
+
+        let mut scan_source = PcapReplaySource::from_bytes_with_flow_limits(
+            "syn-scan-flood",
+            &pcap(&scan_records),
+            limits(),
+            NonZeroUsize::new(4).expect("non-zero"),
+            DEFAULT_FLOW_IDLE_TIMEOUT_NS,
+        )
+        .expect("parse scan flood");
+        let mut emitted = Vec::new();
+        while let CapturePoll::Packet(pkt) = scan_source.poll_next().expect("poll") {
+            emitted.push(pkt);
+        }
+        assert_eq!(emitted.len(), 22);
+        // 20 unique flows into cap 4 -> 16 evictions, plus re-inserting evicted flow 0 -> 17 total.
+        assert_eq!(scan_source.report().evicted_flows, 17);
+        // Retained flow 19 kept generation 0 and advanced sequence to 1.
+        assert_eq!(emitted[20].flow.generation, 0);
+        assert_eq!(emitted[20].packet.sequence, 1);
+        // Evicted flow 0 was evicted from the active table and restarted at sequence 0.
+        assert_eq!(emitted[21].packet.sequence, 0);
+
+        // Bidirectional flow: reverse FIN closes both directions cleanly.
+        let fwd_syn = tcp_frame_ports([192, 0, 2, 1], 51_000, [198, 51, 100, 2], 443, 0x02);
+        let rev_synack = tcp_frame_ports([198, 51, 100, 2], 443, [192, 0, 2, 1], 51_000, 0x12);
+        let rev_fin = tcp_frame_ports([198, 51, 100, 2], 443, [192, 0, 2, 1], 51_000, 0x11);
+        let fwd_after_fin = tcp_frame_ports([192, 0, 2, 1], 51_000, [198, 51, 100, 2], 443, 0x10);
+        let mut bidir = PcapReplaySource::from_bytes(
+            "bidir-fin",
+            &pcap(&[
+                (1, fwd_syn),
+                (2, rev_synack),
+                (3, rev_fin),
+                (4, fwd_after_fin),
+            ]),
+            limits(),
+        )
+        .expect("parse bidir");
+        let mut trace = Vec::new();
+        while let CapturePoll::Packet(pkt) = bidir.poll_next().expect("poll") {
+            trace.push((
+                pkt.flow.generation,
+                pkt.packet.sequence,
+                pkt.packet.direction,
+            ));
+        }
+        assert_eq!(
+            trace,
+            vec![
+                (0, 0, Direction::InitiatorToResponder),
+                (0, 1, Direction::ResponderToInitiator),
+                (0, 2, Direction::ResponderToInitiator),
+                (1, 0, Direction::InitiatorToResponder),
+            ]
+        );
     }
 }
